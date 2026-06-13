@@ -1,0 +1,77 @@
+// Shared domain types for OpenPath.
+// These mirror the JSON shapes the AI flows return so the same types are
+// used by the views, the AI client, and (later) the serverless functions.
+
+export type View = "home" | "roadmap" | "exam" | "vault";
+
+/** The 3 calibration answers that personalise every generation. */
+export interface LearnerProfile {
+  familiarity: string;
+  goal: string;
+  pace: string;
+}
+
+export interface DiagramItem {
+  label: string;
+  detail?: string;
+}
+
+export interface Diagram {
+  type: "flow" | "cycle" | "comparison" | "pyramid";
+  title: string;
+  items: DiagramItem[];
+  colA?: string;
+  colB?: string;
+}
+
+export interface KeyTerm {
+  term: string;
+  def: string;
+}
+
+export interface QuizQuestion {
+  q: string;
+  options: string[];
+  answer: string;
+}
+
+export interface Lesson {
+  lessonText: string;
+  example: string;
+  diagram: Diagram;
+  keyTerms: KeyTerm[];
+  funFact: string;
+  quiz: QuizQuestion[];
+}
+
+export interface RoadmapNode {
+  id: string;
+  title: string;
+  /** Pre-baked lesson for preset roadmaps; AI-generated lessons are cached separately. */
+  lesson?: Lesson;
+}
+
+export interface Phase {
+  id: string;
+  title: string;
+  nodes: RoadmapNode[];
+}
+
+export interface Roadmap {
+  id: string;
+  title: string;
+  description: string;
+  level: string;
+  timeEstimate?: string;
+  outcomes: string[];
+  phases: Phase[];
+  /** The topic string the learner typed (used as cache/identity key). */
+  topic?: string;
+  /** The profile the roadmap was generated for. */
+  profile?: LearnerProfile;
+}
+
+export interface DeeperTopic {
+  id: string;
+  title: string;
+}

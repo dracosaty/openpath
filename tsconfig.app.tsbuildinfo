@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/calibrationmodal.tsx","./src/components/diagram.tsx","./src/components/lessonpanel.tsx","./src/data/presets.ts","./src/lib/ai.ts","./src/lib/calibration.ts","./src/lib/stub.ts","./src/views/comingsoon.tsx","./src/views/explore.tsx","./src/views/roadmapview.tsx"],"version":"5.9.3"}
