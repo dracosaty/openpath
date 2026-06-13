@@ -27,7 +27,9 @@ export async function generateRoadmap(
   profile: LearnerProfile,
 ): Promise<Roadmap> {
   if (USE_STUB) return generateStubRoadmap(topic, profile);
-  return postJSON<Roadmap>("/api/generate-roadmap", { topic, profile });
+  const rm = await postJSON<Roadmap>("/api/generate-roadmap", { topic, profile });
+  // The server returns a pure roadmap; attach identity the client/UI relies on.
+  return { ...rm, topic, profile };
 }
 
 export async function generateLesson(
