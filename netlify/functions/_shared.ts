@@ -2,6 +2,9 @@
 // The Anthropic key lives ONLY here (process.env), never in the browser.
 // Prompts are ported verbatim from the original prototype to preserve behavior.
 
+import { createHash } from "node:crypto";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
 export interface LearnerProfile {
   familiarity: string;
   goal: string;
@@ -81,4 +84,141 @@ export function json(body: unknown, status = 200): Response {
 export function methodGuard(req: Request): Response | null {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   return null;
+}
+
+// ── Supabase admin (service role) ───────────────────────────────────
+// Used ONLY server-side for the cache + rate-limit tables. If the env isn't
+// configured (e.g. local `netlify dev` without Supabase), we degrade
+// gracefully: no cache, no limiting — the proxy still works.
+let _supa: SupabaseClient | null | undefined;
+function supa(): SupabaseClient | null {
+  if (_supa !== undefined) return _supa;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn("Supabase env not set — cache & rate limiting disabled.");
+    _supa = null;
+  } else {
+    _supa = createClient(url, key, { auth: { persistSession: false } });
+  }
+  return _supa;
+}
+
+const PROMPT_VERSION = process.env.PROMPT_VERSION || "v1";
+
+function normalize(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function profileFingerprint(p: LearnerProfile): string {
+  return `${p.familiarity}|${p.goal}|${p.pace}`;
+}
+
+/** Cache key: sha256(flow:model:promptVersion:normalizedSubject:profileFingerprint). */
+function cacheKey(flow: string, subject: string, profile: LearnerProfile): string {
+  const raw = `${flow}:${MODEL}:${PROMPT_VERSION}:${normalize(subject)}:${profileFingerprint(profile)}`;
+  return createHash("sha256").update(raw).digest("hex");
+}
+
+export function getClientIp(req: Request, contextIp?: string): string {
+  return (
+    contextIp ||
+    req.headers.get("x-nf-client-connection-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
+// Conservative free-tier defaults — per IP, fixed windows. Tune before launch.
+// Checked in order; first failure blocks the request.
+const IP_LIMITS = [
+  { suffix: "hour", limit: 30, windowSeconds: 3600 },
+  { suffix: "day", limit: 150, windowSeconds: 86400 },
+];
+
+/** Returns true if allowed. Fails open if Supabase is unreachable (availability > strictness). */
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const db = supa();
+  if (!db) return true;
+  for (const l of IP_LIMITS) {
+    const { data, error } = await db.rpc("check_rate_limit", {
+      p_id: `ip:${ip}:${l.suffix}`,
+      p_limit: l.limit,
+      p_window_seconds: l.windowSeconds,
+    });
+    if (error) {
+      console.error("rate_limit rpc error:", error.message);
+      return true; // fail open
+    }
+    if (data === false) return false;
+  }
+  return true;
+}
+
+async function cacheGet(key: string): Promise<any | null> {
+  const db = supa();
+  if (!db) return null;
+  const { data, error } = await db
+    .from("ai_cache")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+  if (error) {
+    console.error("cache get error:", error.message);
+    return null;
+  }
+  return data?.value ?? null;
+}
+
+async function cacheSet(key: string, flow: string, value: unknown): Promise<void> {
+  const db = supa();
+  if (!db) return;
+  const { error } = await db
+    .from("ai_cache")
+    .upsert({ key, flow, value }, { onConflict: "key" });
+  if (error) console.error("cache set error:", error.message);
+}
+
+/**
+ * Wraps a generation: per-IP rate limit → cache lookup → produce → cache store.
+ * `subject` is the normalized cache subject (topic for roadmap, node title for
+ * lesson/deeper). `produce` does the actual Claude call + post-processing.
+ */
+export async function runGeneration(opts: {
+  req: Request;
+  ip: string;
+  flow: string;
+  subject: string;
+  profile: LearnerProfile;
+  produce: () => Promise<any>;
+}): Promise<Response> {
+  const allowed = await checkRateLimit(opts.ip);
+  if (!allowed) {
+    return json(
+      { error: "Rate limit exceeded. Please try again later." },
+      429,
+    );
+  }
+
+  const key = cacheKey(opts.flow, opts.subject, opts.profile);
+
+  const cached = await cacheGet(key);
+  if (cached) {
+    return new Response(JSON.stringify(cached), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "X-OpenPath-Cache": "HIT" },
+    });
+  }
+
+  try {
+    const value = await opts.produce();
+    await cacheSet(key, opts.flow, value);
+    return new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "X-OpenPath-Cache": "MISS" },
+    });
+  } catch (e: any) {
+    console.error(`${opts.flow} failed:`, e?.message);
+    return json({ error: "Generation failed" }, 502);
+  }
 }

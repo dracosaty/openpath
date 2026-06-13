@@ -1,3 +1,4 @@
+import type { Context } from "@netlify/functions";
 import {
   callClaude,
   formatProfile,
@@ -5,9 +6,11 @@ import {
   clampStr,
   json,
   methodGuard,
+  getClientIp,
+  runGeneration,
 } from "./_shared";
 
-export default async (req: Request): Promise<Response> => {
+export default async (req: Request, context: Context): Promise<Response> => {
   const bad = methodGuard(req);
   if (bad) return bad;
 
@@ -41,29 +44,32 @@ Return ONLY:
   ]
 }`;
 
-  try {
-    const r = await callClaude(userPrompt, system, 1500);
-    const t = Date.now();
-    // Post-process into our Roadmap shape, assigning stable ids (ported from prototype).
-    const roadmap = {
-      id: `rm_${t}`,
-      title: r.title || topic,
-      description: r.description || "",
-      level: r.level || "Beginner",
-      timeEstimate: r.timeEstimate || "",
-      outcomes: r.outcomes || [],
-      phases: (r.phases || []).map((p: any, pi: number) => ({
-        id: `p_${t}_${pi}`,
-        title: p.title,
-        nodes: (p.nodes || []).map((n: any, ni: number) => ({
-          id: `n_${t}_${pi}_${ni}`,
-          title: typeof n === "string" ? n : n.title,
+  return runGeneration({
+    req,
+    ip: getClientIp(req, context.ip),
+    flow: "roadmap",
+    subject: topic,
+    profile,
+    produce: async () => {
+      const r = await callClaude(userPrompt, system, 1500);
+      const t = Date.now();
+      // Post-process into our Roadmap shape, assigning stable ids (ported from prototype).
+      return {
+        id: `rm_${t}`,
+        title: r.title || topic,
+        description: r.description || "",
+        level: r.level || "Beginner",
+        timeEstimate: r.timeEstimate || "",
+        outcomes: r.outcomes || [],
+        phases: (r.phases || []).map((p: any, pi: number) => ({
+          id: `p_${t}_${pi}`,
+          title: p.title,
+          nodes: (p.nodes || []).map((n: any, ni: number) => ({
+            id: `n_${t}_${pi}_${ni}`,
+            title: typeof n === "string" ? n : n.title,
+          })),
         })),
-      })),
-    };
-    return json(roadmap);
-  } catch (e: any) {
-    console.error("generate-roadmap failed:", e?.message);
-    return json({ error: "Generation failed" }, 502);
-  }
+      };
+    },
+  });
 };

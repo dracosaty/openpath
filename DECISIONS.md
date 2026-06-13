@@ -8,6 +8,14 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - **Mock modules:** Proctoring *and* blockchain credentials descoped to "coming soon" stubs for v1.
 - **Scale/budget:** Tiny / free-tier only → aggressive caching, tight per-IP limits.
 
+## Step 3 — caching + rate limiting (this commit)
+- **Storage:** Supabase Postgres. Two tables in `supabase/migrations/0001_cache_and_ratelimit.sql`: `ai_cache` and `rate_limits`. RLS on, **no policies** → only the service-role key (functions) can touch them; anon/auth clients are denied.
+- **Cache key (approved):** `sha256(flow : model : promptVersion : normalizedSubject : profileFingerprint)`. Verified: casing/whitespace-insensitive, profile-sensitive, flow-sensitive. `promptVersion` = `PROMPT_VERSION` env (default `v1`) — bump to invalidate everything; model is in the key so a model upgrade self-invalidates. Lesson/deeper subjects are namespaced by path (`path :: node`) so the same node title in two roadmaps doesn't collide.
+- **Responses carry `X-OpenPath-Cache: HIT|MISS`** so cache behavior is observable.
+- **Rate limiting:** fixed-window per-IP via the `check_rate_limit` SQL function (atomic upsert). Conservative free-tier defaults: **30/hour and 150/day per IP** across all generation endpoints. Tune in `IP_LIMITS` (`_shared.ts`) before launch. Per-*user* limits come with auth in Step 4.
+- **Fail-open / graceful degrade:** if Supabase env is unset or the DB errors, caching and limiting are skipped and the proxy still serves (availability > strictness for v1). Verified the no-env path still returns 200.
+- **[NEEDS INPUT later]** rate-limit numbers are a guess; revisit once you know real usage. Also: no cache TTL yet — entries live until manually pruned (housekeeping SQL is in the migration, commented, ready for pg_cron).
+
 ## Step 2 — backend proxy (this commit)
 - **Netlify Functions v2 (Web API style)**: `generate-roadmap|lesson|deeper` under `netlify/functions/`. The Anthropic key is read only via `process.env.ANTHROPIC_API_KEY` in `_shared.ts` — server-only. **Verified**: built client bundle (`dist/`) contains no key, no `api.anthropic.com`, no `x-api-key`.
 - **Prompts ported verbatim** from the prototype (roadmap 1500 tok, lesson 1100, deeper 1000), including the `formatProfile`/`x()` learner-profile fragment, the ` ```json ` fence stripping, and the regex JSON extraction. ID assignment (`rm_/p_/n_/d_`) moved server-side.

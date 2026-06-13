@@ -60,6 +60,27 @@ design. Secrets must **not** carry that prefix.
 > ⚠️ If an Anthropic key was ever shipped in a browser build of the prototype,
 > treat it as compromised and **rotate it**.
 
+## Supabase setup (cache + rate limiting)
+1. In your Supabase project, open **SQL Editor** and run
+   `supabase/migrations/0001_cache_and_ratelimit.sql`. This creates the
+   `ai_cache` and `rate_limits` tables (RLS on, service-role only) and the
+   `check_rate_limit` function.
+2. Set the **server-side** env vars (Netlify → Site settings → Environment, or
+   your local `.env` for `netlify dev`):
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `PROMPT_VERSION`.
+3. Caching is automatic. Every generation response includes an
+   `X-OpenPath-Cache: HIT|MISS` header.
+
+**Verify caching locally:** with `netlify dev` running against Supabase, generate
+the same roadmap twice with the same calibration answers. The first response is
+`MISS` (hits the model); the second is `HIT` (served from Postgres, no model
+cost, near-instant). Different calibration answers → different key → `MISS`.
+
+**Rate limits:** 30/hour and 150/day per IP across all generation endpoints
+(free-tier defaults; tune `IP_LIMITS` in `netlify/functions/_shared.ts`). If
+Supabase env is missing, caching and limiting are skipped and the proxy still
+works.
+
 ## Deploy (Netlify)
 1. Connect the repo; build command `npm run build`, publish dir `dist`
    (already set in `netlify.toml`).
