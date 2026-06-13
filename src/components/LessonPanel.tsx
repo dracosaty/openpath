@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { generateLesson, generateDeeper } from "../lib/ai";
+import { submitFeedback } from "../lib/db";
+import { authEnabled } from "../lib/supabase";
 import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic } from "../types";
 import Diagram from "./Diagram";
 
@@ -8,6 +10,7 @@ interface Props {
   pathTitle: string;
   profile: LearnerProfile;
   isDone: boolean;
+  roadmapDbId: string | null;
   onClose: () => void;
   onComplete: () => void;
   onAddDeeper: (topics: DeeperTopic[]) => void;
@@ -18,6 +21,7 @@ export default function LessonPanel({
   pathTitle,
   profile,
   isDone,
+  roadmapDbId,
   onClose,
   onComplete,
   onAddDeeper,
@@ -26,6 +30,9 @@ export default function LessonPanel({
   const [error, setError] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [loadingDeeper, setLoadingDeeper] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [reportDone, setReportDone] = useState(false);
 
   async function load() {
     setError(false);
@@ -41,8 +48,19 @@ export default function LessonPanel({
   useEffect(() => {
     load();
     setPicked(null);
+    setReporting(false);
+    setReason("");
+    setReportDone(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.id]);
+
+  async function sendReport() {
+    const ok = await submitFeedback({ roadmapId: roadmapDbId, node, pathTitle, reason });
+    setReporting(false);
+    setReason("");
+    setReportDone(ok);
+    if (!ok) alert("Sign in to report issues — your feedback is saved to your account.");
+  }
 
   async function goDeeper() {
     setLoadingDeeper(true);
@@ -136,15 +154,48 @@ export default function LessonPanel({
                 <button className="btn-outline" onClick={goDeeper} disabled={loadingDeeper}>
                   {loadingDeeper ? "Finding…" : "Go deeper →"}
                 </button>
-                {/* Feedback hook lands in Step 5 (writes to node_feedback). */}
-                <button
-                  className="nav-link"
-                  title="Report an inaccuracy (wired to DB in a later step)"
-                  onClick={() => alert("Thanks — issue reporting saves to the DB in a later build step.")}
-                >
-                  ⚑ Report issue
-                </button>
+                {/* Feedback hook → writes to node_feedback (RLS: own rows). */}
+                {reportDone ? (
+                  <span className="nav-link" style={{ color: "var(--accent)" }}>
+                    ✓ Thanks — reported
+                  </span>
+                ) : (
+                  <button
+                    className="nav-link"
+                    title={authEnabled ? "Report an inaccuracy" : "Sign in to report issues"}
+                    onClick={() => setReporting((r) => !r)}
+                  >
+                    ⚑ Report issue
+                  </button>
+                )}
               </div>
+
+              {reporting && (
+                <div style={{ marginTop: 12 }}>
+                  <textarea
+                    placeholder="What's wrong or inaccurate about this lesson?"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid var(--ink-12)",
+                      borderRadius: 10,
+                      fontFamily: "var(--font-body)",
+                      fontSize: 14,
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button className="btn-dark" disabled={!reason.trim()} onClick={sendReport}>
+                      Submit report
+                    </button>
+                    <button className="btn-outline" onClick={() => setReporting(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

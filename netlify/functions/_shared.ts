@@ -155,6 +155,35 @@ async function checkRateLimit(ip: string): Promise<boolean> {
   return true;
 }
 
+/** Verify the Supabase JWT (if present) and return the user id, else null. */
+async function getUserId(req: Request): Promise<string | null> {
+  const auth = req.headers.get("authorization");
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  const db = supa();
+  if (!token || !db) return null;
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
+}
+
+// Signed-in users get their own (more generous) daily budget on top of the IP cap.
+const USER_LIMIT = { limit: 100, windowSeconds: 86400 };
+
+async function checkUserRateLimit(userId: string): Promise<boolean> {
+  const db = supa();
+  if (!db) return true;
+  const { data, error } = await db.rpc("check_rate_limit", {
+    p_id: `user:${userId}:day`,
+    p_limit: USER_LIMIT.limit,
+    p_window_seconds: USER_LIMIT.windowSeconds,
+  });
+  if (error) {
+    console.error("user rate_limit rpc error:", error.message);
+    return true; // fail open
+  }
+  return data !== false;
+}
+
 async function cacheGet(key: string): Promise<any | null> {
   const db = supa();
   if (!db) return null;
@@ -192,12 +221,13 @@ export async function runGeneration(opts: {
   profile: LearnerProfile;
   produce: () => Promise<any>;
 }): Promise<Response> {
-  const allowed = await checkRateLimit(opts.ip);
-  if (!allowed) {
-    return json(
-      { error: "Rate limit exceeded. Please try again later." },
-      429,
-    );
+  if (!(await checkRateLimit(opts.ip))) {
+    return json({ error: "Rate limit exceeded. Please try again later." }, 429);
+  }
+  // Per-user budget for signed-in callers (in addition to the IP cap).
+  const userId = await getUserId(opts.req);
+  if (userId && !(await checkUserRateLimit(userId))) {
+    return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
   }
 
   const key = cacheKey(opts.flow, opts.subject, opts.profile);

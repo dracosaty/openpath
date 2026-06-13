@@ -81,6 +81,27 @@ cost, near-instant). Different calibration answers → different key → `MISS`.
 Supabase env is missing, caching and limiting are skipped and the proxy still
 works.
 
+## Auth & persistence
+Run both migrations in the Supabase SQL editor (`0001_*` then `0002_*`).
+`0002` adds `roadmaps`, `progress`, and `node_feedback`, each with RLS policies
+keyed on `auth.uid()` so a user only ever sees their own rows.
+
+- **Sign up / sign in** via email + password (Supabase Auth). The "Sign in" nav
+  link only appears when `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set;
+  otherwise the app runs in **no-account mode** (generation works, nothing is
+  saved).
+- **Saved roadmaps + progress**: signed-in users' roadmaps auto-save on
+  generation; completing a node persists; "My Roadmap" lists saved roadmaps to
+  resume across sessions.
+- **Feedback hook**: each lesson has a **⚑ Report issue** button that writes to
+  `node_feedback` (admin-read only). Read it with the service role:
+  `select * from node_feedback order by created_at desc;`
+- **Per-user rate limit**: the client sends its session token; signed-in users
+  get a 100/day budget on top of the per-IP caps.
+
+> Persistence runs **directly browser→Supabase** under RLS (standard Supabase
+> pattern). The Netlify Functions are only for the Anthropic proxy + cache/limits.
+
 ## Deploy (Netlify)
 1. Connect the repo; build command `npm run build`, publish dir `dist`
    (already set in `netlify.toml`).

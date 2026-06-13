@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
 import type { Roadmap, RoadmapNode, DeeperTopic } from "../types";
+import type { SavedRoadmap } from "../lib/db";
 import LessonPanel from "../components/LessonPanel";
 
 interface Props {
   roadmap: Roadmap | null;
   completed: Set<string>;
+  saved: SavedRoadmap[];
+  roadmapDbId: string | null;
+  onResume: (s: SavedRoadmap) => void;
   onComplete: (nodeId: string) => void;
   onBack: () => void;
   onMutate: (next: Roadmap) => void;
@@ -13,6 +17,9 @@ interface Props {
 export default function RoadmapView({
   roadmap,
   completed,
+  saved,
+  roadmapDbId,
+  onResume,
   onComplete,
   onBack,
   onMutate,
@@ -36,9 +43,29 @@ export default function RoadmapView({
   if (!roadmap) {
     return (
       <div className="rm-page">
-        <h2>No roadmap yet</h2>
-        <p className="modal-sub">Generate one from the Explore page to get started.</p>
-        <button className="btn-outline" onClick={onBack}>
+        {saved.length > 0 ? (
+          <>
+            <h2>Your roadmaps</h2>
+            <p className="modal-sub">Pick up where you left off.</p>
+            <div className="roadmap-grid" style={{ marginTop: 16 }}>
+              {saved.map((s) => (
+                <div key={s.id} className="roadmap-card" onClick={() => onResume(s)}>
+                  <h3>{s.title}</h3>
+                  <p>{s.data.description}</p>
+                  <div className="rc-meta">
+                    <span className="tag green">{s.data.level}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>No roadmap yet</h2>
+            <p className="modal-sub">Generate one from the Explore page to get started.</p>
+          </>
+        )}
+        <button className="btn-outline" style={{ marginTop: 18 }} onClick={onBack}>
           ← Explore
         </button>
       </div>
@@ -122,6 +149,7 @@ export default function RoadmapView({
           pathTitle={roadmap.title}
           profile={roadmap.profile}
           isDone={completed.has(openNode.node.id)}
+          roadmapDbId={roadmapDbId}
           onClose={() => setOpenNode(null)}
           onComplete={() => onComplete(openNode.node.id)}
           onAddDeeper={(topics) => addDeeper(openNode.phaseId, topics)}

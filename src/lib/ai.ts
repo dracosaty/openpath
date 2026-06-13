@@ -5,17 +5,23 @@ import type {
   LearnerProfile,
 } from "../types";
 import { generateStubRoadmap, generateStubLesson, generateStubDeeper } from "./stub";
+import { supabase } from "./supabase";
 
-// ── Step 1 (skeleton): no backend exists yet, so we serve generated
-// placeholder content from ./stub. In Step 2 we point these three calls at
-// the Netlify Functions (/api/generate-*) which hold the Anthropic key
-// server-side. Flip USE_STUB to false (or set VITE_USE_STUB=false) then.
+// The Netlify Functions (/api/generate-*) hold the Anthropic key server-side.
+// The stub remains the default so `npm run dev` works with no key; set
+// VITE_USE_STUB=false (e.g. under `netlify dev`) to hit the real backend.
 const USE_STUB = import.meta.env.VITE_USE_STUB !== "false";
 
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // Attach the session token so the backend can apply per-user rate limits.
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
+  }
   const res = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`API ${res.status}`);

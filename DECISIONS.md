@@ -8,6 +8,15 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - **Mock modules:** Proctoring *and* blockchain credentials descoped to "coming soon" stubs for v1.
 - **Scale/budget:** Tiny / free-tier only → aggressive caching, tight per-IP limits.
 
+## Step 4 + 5 — auth, persistence, feedback (this commit)
+- **Folded Step 5 (feedback) into Step 4** — both need auth + a table; small and cohesive.
+- **Persistence is browser→Supabase under RLS**, not via the functions. This is the standard Supabase pattern and keeps the functions focused on the Anthropic proxy. Migration `0002` adds `roadmaps`, `progress`, `node_feedback`, each with `auth.uid()`-scoped policies. `node_feedback` has insert-only policy (admin reads via service role).
+- **Auth:** email/password (Supabase Auth) via `AuthModal`. Email-confirmation flow handled (shows "check your email" then returns to sign-in). **[NEEDS INPUT]** confirm whether to enable email confirmation in Supabase (default on) or allow instant sign-in for the beta.
+- **No-account mode:** if `VITE_SUPABASE_*` is unset, `supabase` is null, "Sign in" is hidden, and every db call no-ops. App still generates. This is also why local stub dev needs no Supabase.
+- **Saved-roadmaps UX:** generation auto-saves; "My Roadmap" shows a resume list when there's no active roadmap; completion + "go deeper" mutations persist. Kept intentionally simple — no rename/delete/share yet.
+- **Per-user rate limit:** client attaches the Supabase access token; functions verify it (`getUser`) and apply a 100/day per-user cap on top of the IP caps. Verified token-less path still works (IP-only).
+- **Data model choice:** progress is its own table (one row per completed node) rather than a jsonb array on `roadmaps` — clean upserts/deletes and indexable. Full roadmap stored as jsonb (it's read whole).
+
 ## Step 3 — caching + rate limiting (this commit)
 - **Storage:** Supabase Postgres. Two tables in `supabase/migrations/0001_cache_and_ratelimit.sql`: `ai_cache` and `rate_limits`. RLS on, **no policies** → only the service-role key (functions) can touch them; anon/auth clients are denied.
 - **Cache key (approved):** `sha256(flow : model : promptVersion : normalizedSubject : profileFingerprint)`. Verified: casing/whitespace-insensitive, profile-sensitive, flow-sensitive. `promptVersion` = `PROMPT_VERSION` env (default `v1`) — bump to invalidate everything; model is in the key so a model upgrade self-invalidates. Lesson/deeper subjects are namespaced by path (`path :: node`) so the same node title in two roadmaps doesn't collide.

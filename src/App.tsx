@@ -1,19 +1,43 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { View, Roadmap, LearnerProfile } from "./types";
 import { generateRoadmap } from "./lib/ai";
 import { type PresetCard } from "./data/presets";
+import { supabase, authEnabled } from "./lib/supabase";
+import { useSession } from "./lib/useSession";
+import {
+  saveRoadmap,
+  updateRoadmapData,
+  listRoadmaps,
+  loadProgress,
+  setNodeComplete,
+  type SavedRoadmap,
+} from "./lib/db";
 import Explore from "./views/Explore";
 import RoadmapView from "./views/RoadmapView";
 import ComingSoon from "./views/ComingSoon";
 import CalibrationModal from "./components/CalibrationModal";
+import AuthModal from "./components/AuthModal";
 
 export default function App() {
+  const { session } = useSession();
   const [view, setView] = useState<View>("home");
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [roadmapDbId, setRoadmapDbId] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [pendingTopic, setPendingTopic] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [saved, setSaved] = useState<SavedRoadmap[]>([]);
+
+  const refreshSaved = useCallback(async () => {
+    if (session) setSaved(await listRoadmaps());
+    else setSaved([]);
+  }, [session]);
+
+  useEffect(() => {
+    refreshSaved();
+  }, [refreshSaved]);
 
   async function runGeneration(topic: string, profile: LearnerProfile) {
     setPendingTopic(null);
@@ -24,6 +48,10 @@ export default function App() {
       setRoadmap(rm);
       setCompleted(new Set());
       setView("roadmap");
+      // Persist for signed-in users.
+      const id = await saveRoadmap(rm);
+      setRoadmapDbId(id);
+      refreshSaved();
     } catch {
       setError("Something went wrong while generating. Please try again.");
     } finally {
@@ -32,16 +60,34 @@ export default function App() {
   }
 
   function openPreset(p: PresetCard) {
-    // Presets reuse the same calibration → generate flow for now.
     setPendingTopic(p.title);
+  }
+
+  async function resumeRoadmap(s: SavedRoadmap) {
+    setRoadmap(s.data);
+    setRoadmapDbId(s.id);
+    setCompleted(new Set(await loadProgress(s.id)));
+    setView("roadmap");
   }
 
   function toggleComplete(nodeId: string) {
     setCompleted((prev) => {
       const next = new Set(prev);
-      next.has(nodeId) ? next.delete(nodeId) : next.add(nodeId);
+      const willComplete = !next.has(nodeId);
+      willComplete ? next.add(nodeId) : next.delete(nodeId);
+      if (roadmapDbId) setNodeComplete(roadmapDbId, nodeId, willComplete);
       return next;
     });
+  }
+
+  function mutateRoadmap(next: Roadmap) {
+    setRoadmap(next);
+    if (roadmapDbId) updateRoadmapData(roadmapDbId, next);
+  }
+
+  async function signOut() {
+    await supabase?.auth.signOut();
+    setSaved([]);
   }
 
   const navItem = (v: View, label: string, enabled = true) => (
@@ -54,6 +100,8 @@ export default function App() {
     </span>
   );
 
+  const hasRoadmapNav = !!roadmap || saved.length > 0;
+
   return (
     <>
       <nav className="topnav">
@@ -62,11 +110,24 @@ export default function App() {
           OpenPath
         </div>
         {navItem("home", "Explore")}
-        {navItem("roadmap", "My Roadmap", !!roadmap)}
+        {navItem("roadmap", "My Roadmap", hasRoadmapNav)}
         {navItem("exam", "Exams")}
         {navItem("vault", "Credentials")}
         <div className="nav-right">
-          <span className="nav-link">Sign in</span>
+          {!authEnabled ? null : session ? (
+            <>
+              <span className="nav-link" style={{ opacity: 0.7 }}>
+                {session.user.email}
+              </span>
+              <span className="nav-link" onClick={signOut}>
+                Sign out
+              </span>
+            </>
+          ) : (
+            <span className="nav-link" onClick={() => setAuthOpen(true)}>
+              Sign in
+            </span>
+          )}
         </div>
       </nav>
 
@@ -92,9 +153,12 @@ export default function App() {
         <RoadmapView
           roadmap={roadmap}
           completed={completed}
+          saved={saved}
+          onResume={resumeRoadmap}
           onComplete={toggleComplete}
           onBack={() => setView("home")}
-          onMutate={setRoadmap}
+          onMutate={mutateRoadmap}
+          roadmapDbId={roadmapDbId}
         />
       )}
 
@@ -121,6 +185,8 @@ export default function App() {
           onDone={(profile) => runGeneration(pendingTopic, profile)}
         />
       )}
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </>
   );
 }
