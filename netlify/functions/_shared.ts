@@ -12,9 +12,10 @@ export interface LearnerProfile {
 }
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-// Ported from the prototype. Bump deliberately if you intend to change behavior;
-// the cache key (Step 3) includes the model so this also busts stale cache.
-export const MODEL = "claude-sonnet-4-20250514";
+// Using Haiku (fastest + cheapest Claude model) for cost-efficient generation.
+// This is Claude (Anthropic) — set ANTHROPIC_API_KEY in Netlify env vars.
+// Bump deliberately if you intend to change behavior; cache key includes model.
+export const MODEL = "claude-haiku-4-5-20251001";
 
 /** Profile → system-prompt fragment. Ported verbatim from the prototype's x(). */
 export function formatProfile(p: LearnerProfile): string {
@@ -191,6 +192,7 @@ async function cacheGet(key: string): Promise<any | null> {
     .from("ai_cache")
     .select("value")
     .eq("key", key)
+    .gt("expires_at", new Date().toISOString())
     .maybeSingle();
   if (error) {
     console.error("cache get error:", error.message);
@@ -199,12 +201,15 @@ async function cacheGet(key: string): Promise<any | null> {
   return data?.value ?? null;
 }
 
+const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 async function cacheSet(key: string, flow: string, value: unknown): Promise<void> {
   const db = supa();
   if (!db) return;
+  const expires_at = new Date(Date.now() + TTL_MS).toISOString();
   const { error } = await db
     .from("ai_cache")
-    .upsert({ key, flow, value }, { onConflict: "key" });
+    .upsert({ key, flow, value, expires_at }, { onConflict: "key" });
   if (error) console.error("cache set error:", error.message);
 }
 

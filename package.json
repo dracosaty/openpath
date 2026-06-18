@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "description": "OpenPath — AI-guided learning platform: type any topic, get a personalised roadmap with lessons, diagrams, and quizzes.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

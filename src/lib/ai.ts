@@ -5,6 +5,7 @@ import type {
   LearnerProfile,
 } from "../types";
 import { generateStubRoadmap, generateStubLesson, generateStubDeeper } from "./stub";
+import { findPreset } from "../data/presetData";
 import { supabase } from "./supabase";
 
 // The Netlify Functions (/api/generate-*) hold the Anthropic key server-side.
@@ -33,6 +34,9 @@ export async function generateRoadmap(
   profile: LearnerProfile,
 ): Promise<Roadmap> {
   if (USE_STUB) return generateStubRoadmap(topic, profile);
+  // Use pre-baked structure for known presets — no API call needed.
+  const preset = findPreset(topic);
+  if (preset) return { ...preset, topic, profile };
   const rm = await postJSON<Roadmap>("/api/generate-roadmap", { topic, profile });
   // The server returns a pure roadmap; attach identity the client/UI relies on.
   return { ...rm, topic, profile };

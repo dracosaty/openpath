@@ -4,14 +4,18 @@ AI-guided learning platform. Type any topic → answer 3 calibration questions �
 get a personalised roadmap with per-node lessons (text, diagrams, quizzes, and
 "go deeper" branches).
 
-This repo is the productionized version of the original single-file prototype
-(preserved at `_prototype/openpath.original.html`). It splits that bundle into a
-proper **Vite + React + TypeScript** app and adds a thin serverless backend so
-the Anthropic API key is never exposed to the browser.
+This repo is the productionized version of an original single-file HTML/React
+prototype (kept outside this repo). It splits that bundle into a proper
+**Vite + React + TypeScript** app and adds a thin serverless backend so the
+Anthropic API key is never exposed to the browser.
 
-> **Build status:** Phase 1, Step 1 — repo skeleton. The UI loop runs against a
-> local **stub** (no API key needed). The backend proxy, caching, auth, and
-> persistence land in subsequent steps. See `DECISIONS.md`.
+> **Build status:** Phase 1 complete — repo restructure, server-side Anthropic
+> proxy, Supabase-backed cache + rate limiting, auth + persistence, and the
+> per-node feedback hook. Proctoring and blockchain credentials are intentionally
+> descoped to "coming soon" for v1. See `DECISIONS.md` for the full log.
+>
+> Locally the UI runs against a **stub** (no key needed); set `VITE_USE_STUB=false`
+> under `netlify dev` to hit the real backend.
 
 ## Architecture (target)
 
@@ -126,5 +130,17 @@ app/
     data/         presets (popular roadmaps)
     styles.css    design system, ported verbatim from the prototype
     types.ts      shared domain types
-  netlify/functions/   (serverless proxy — added in Step 2)
+  netlify/functions/   serverless proxy (Anthropic key + cache + rate limits)
+  supabase/migrations/ SQL schema (cache, rate limits, roadmaps, progress, feedback)
 ```
+
+## Contributing
+Issues and PRs welcome. Run `npm run build` (typecheck + build) before opening a
+PR. The app loop works against the stub with no keys, so you can develop most of
+the frontend without any Supabase/Anthropic setup.
+
+## License
+[MIT](./LICENSE) © OpenPath Contributors.
+
+Note: `package.json` is marked `"private": true` to guard against accidental
+`npm publish`. That is unrelated to the source license — the code is MIT.

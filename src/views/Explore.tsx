@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PRESETS, SUGGESTIONS, type PresetCard } from "../data/presets";
 
 interface Props {
@@ -6,9 +6,37 @@ interface Props {
   onOpenPreset: (preset: PresetCard) => void;
 }
 
+const ANIMATED_TOPICS = [
+  "Python for beginners",
+  "History of the Roman Empire",
+  "Machine Learning fundamentals",
+  "Photography basics",
+  "Learn Spanish",
+  "Quantum physics",
+  "Personal finance",
+  "Web development",
+  "Philosophy of mind",
+  "Chess strategy",
+];
+
 /** Landing / Explore page: hero generator box + popular roadmaps. */
 export default function Explore({ onStart, onOpenPreset }: Props) {
   const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [topicIdx, setTopicIdx] = useState(0);
+  const [phVisible, setPhVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPhVisible(false);
+      setTimeout(() => {
+        setTopicIdx((i) => (i + 1) % ANIMATED_TOPICS.length);
+        setPhVisible(true);
+      }, 300);
+    }, 2800);
+    return () => clearInterval(id);
+  }, []);
+
   const go = (t: string) => t.trim() && onStart(t.trim());
 
   return (
@@ -30,12 +58,37 @@ export default function Explore({ onStart, onOpenPreset }: Props) {
         </p>
 
         <div className="gen-box">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && go(value)}
-            placeholder="What do you want to learn? e.g. Astrophysics, Excel, French…"
-          />
+          <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center" }}>
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && go(value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder=""
+              aria-label="What do you want to learn?"
+            />
+            {!value && !focused && (
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  pointerEvents: "none",
+                  color: "var(--ink-40)",
+                  fontSize: 16,
+                  fontWeight: 500,
+                  opacity: phVisible ? 1 : 0,
+                  transition: "opacity 0.3s ease",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  maxWidth: "100%",
+                }}
+              >
+                {ANIMATED_TOPICS[topicIdx]}
+              </span>
+            )}
+          </div>
           <button className="btn-dark" onClick={() => go(value)}>
             Generate
           </button>
