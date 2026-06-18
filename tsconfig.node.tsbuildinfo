@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts","./netlify/functions/_shared.ts","./netlify/functions/generate-deeper.ts","./netlify/functions/generate-lesson.ts","./netlify/functions/generate-roadmap.ts"],"version":"5.9.3"}
+{"root":["./vite.config.ts","./netlify/functions/_shared.ts","./netlify/functions/generate-deeper.ts","./netlify/functions/generate-lesson.ts","./netlify/functions/generate-roadmap.ts","./netlify/functions/get-public-roadmap.ts"],"version":"5.9.3"}

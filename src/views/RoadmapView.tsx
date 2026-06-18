@@ -12,6 +12,7 @@ interface Props {
   onComplete: (nodeId: string) => void;
   onBack: () => void;
   onMutate: (next: Roadmap) => void;
+  onShare: (variant: "share" | "complete") => void;
 }
 
 export default function RoadmapView({
@@ -23,6 +24,7 @@ export default function RoadmapView({
   onComplete,
   onBack,
   onMutate,
+  onShare,
 }: Props) {
   const [openNode, setOpenNode] = useState<{ node: RoadmapNode; phaseId: string } | null>(null);
 
@@ -97,13 +99,43 @@ export default function RoadmapView({
       </button>
 
       <div className="rm-header">
-        <h1>{roadmap.title}</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{ margin: 0 }}>{roadmap.title}</h1>
+          <button className="btn-outline" onClick={() => onShare("share")}>
+            ↗ Share
+          </button>
+        </div>
         <p className="rm-desc">{roadmap.description}</p>
         <div className="rc-meta">
           <span className="tag green">{roadmap.level}</span>
           {roadmap.timeEstimate && <span className="tag">{roadmap.timeEstimate}</span>}
         </div>
       </div>
+
+      {pct === 100 && (
+        <div
+          className="outcomes-banner"
+          style={{
+            background: "var(--accent-soft)",
+            borderColor: "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <strong>🎉 Roadmap complete!</strong>
+            <div style={{ color: "var(--ink-60)", fontSize: 14, marginTop: 2 }}>
+              You finished every step of {roadmap.title}. Share your proof.
+            </div>
+          </div>
+          <button className="btn-dark" onClick={() => onShare("complete")}>
+            Share my achievement →
+          </button>
+        </div>
+      )}
 
       {roadmap.outcomes?.length > 0 && (
         <div className="outcomes-banner">

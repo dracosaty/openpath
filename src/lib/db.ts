@@ -37,6 +37,20 @@ export async function saveRoadmap(roadmap: Roadmap): Promise<string | null> {
   return data.id;
 }
 
+/** Mark a roadmap public so it can be shared by link. Returns success. */
+export async function makeRoadmapPublic(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("roadmaps")
+    .update({ is_public: true })
+    .eq("id", id);
+  if (error) {
+    console.error("makeRoadmapPublic:", error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Persist roadmap mutations (e.g. "go deeper" nodes appended). */
 export async function updateRoadmapData(id: string, roadmap: Roadmap): Promise<void> {
   if (!supabase) return;

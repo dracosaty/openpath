@@ -12,11 +12,14 @@ import {
   setNodeComplete,
   type SavedRoadmap,
 } from "./lib/db";
+import { fetchPublicRoadmap } from "./lib/public";
 import Explore from "./views/Explore";
 import RoadmapView from "./views/RoadmapView";
+import PublicRoadmap from "./views/PublicRoadmap";
 import ComingSoon from "./views/ComingSoon";
 import CalibrationModal from "./components/CalibrationModal";
 import AuthModal from "./components/AuthModal";
+import ShareSheet from "./components/ShareSheet";
 
 export default function App() {
   const { session } = useSession();
@@ -29,6 +32,31 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [saved, setSaved] = useState<SavedRoadmap[]>([]);
+  const [publicRoadmap, setPublicRoadmap] = useState<Roadmap | null>(null);
+  const [share, setShare] = useState<"share" | "complete" | null>(null);
+
+  // Handle shared links (?r=<id>) and topic-seeded links (?topic=...) on load.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get("r");
+    const topic = params.get("topic");
+    if (r) {
+      fetchPublicRoadmap(r).then((rm) => rm && setPublicRoadmap(rm));
+    } else if (topic) {
+      setPendingTopic(topic);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  function clearUrl() {
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+
+  function exitPublic() {
+    setPublicRoadmap(null);
+    clearUrl();
+    setView("home");
+  }
 
   const refreshSaved = useCallback(async () => {
     if (session) setSaved(await listRoadmaps());
@@ -41,6 +69,8 @@ export default function App() {
 
   async function runGeneration(topic: string, profile: LearnerProfile) {
     setPendingTopic(null);
+    setPublicRoadmap(null);
+    clearUrl();
     setGenerating(true);
     setError(null);
     try {
@@ -145,21 +175,36 @@ export default function App() {
         </div>
       )}
 
-      {!generating && view === "home" && (
-        <Explore onStart={setPendingTopic} onOpenPreset={openPreset} />
-      )}
-
-      {!generating && view === "roadmap" && (
-        <RoadmapView
-          roadmap={roadmap}
-          completed={completed}
-          saved={saved}
-          onResume={resumeRoadmap}
-          onComplete={toggleComplete}
-          onBack={() => setView("home")}
-          onMutate={mutateRoadmap}
-          roadmapDbId={roadmapDbId}
+      {publicRoadmap && !generating ? (
+        <PublicRoadmap
+          roadmap={publicRoadmap}
+          onCreateOwn={(t) => {
+            setPublicRoadmap(null);
+            clearUrl();
+            setPendingTopic(t);
+          }}
+          onExplore={exitPublic}
         />
+      ) : (
+        <>
+          {!generating && view === "home" && (
+            <Explore onStart={setPendingTopic} onOpenPreset={openPreset} />
+          )}
+
+          {!generating && view === "roadmap" && (
+            <RoadmapView
+              roadmap={roadmap}
+              completed={completed}
+              saved={saved}
+              onResume={resumeRoadmap}
+              onComplete={toggleComplete}
+              onBack={() => setView("home")}
+              onMutate={mutateRoadmap}
+              onShare={(v) => setShare(v)}
+              roadmapDbId={roadmapDbId}
+            />
+          )}
+        </>
       )}
 
       {view === "exam" && (
@@ -187,6 +232,15 @@ export default function App() {
       )}
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+
+      {share && roadmap && (
+        <ShareSheet
+          roadmap={roadmap}
+          roadmapDbId={roadmapDbId}
+          variant={share}
+          onClose={() => setShare(null)}
+        />
+      )}
     </>
   );
 }
