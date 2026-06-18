@@ -9,6 +9,8 @@ export interface LearnerProfile {
   familiarity: string;
   goal: string;
   pace: string;
+  context?: string;
+  language?: string;
 }
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -17,10 +19,18 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 // Bump deliberately if you intend to change behavior; cache key includes model.
 export const MODEL = "claude-haiku-4-5-20251001";
 
-/** Profile → system-prompt fragment. Ported verbatim from the prototype's x(). */
+/** Profile → system-prompt fragment. Extends the prototype's x() with optional
+ *  background context and output language. */
 export function formatProfile(p: LearnerProfile): string {
-  return `Learner profile — familiarity: ${p.familiarity}; goal: ${p.goal}; preferred pace: ${p.pace}.
+  let s = `Learner profile — familiarity: ${p.familiarity}; goal: ${p.goal}; preferred pace: ${p.pace}.
 Adapt vocabulary, depth and examples to this profile. A complete beginner gets plain language and analogies; an advanced learner gets precise terminology and nuance.`;
+  if (p.context && p.context.trim()) {
+    s += `\nLearner background/context: ${p.context.trim().slice(0, 1500)}. Use this to skip what they already know and emphasise their gaps; reference their stated field/curriculum where relevant.`;
+  }
+  if (p.language && p.language.trim() && p.language.trim().toLowerCase() !== "english") {
+    s += `\nIMPORTANT: Write ALL content (titles, text, examples, quiz) in ${p.language.trim()}. Keep JSON keys in English.`;
+  }
+  return s;
 }
 
 /** Calls Claude and parses the JSON out of the response. Mirrors the prototype's b(). */
@@ -112,7 +122,8 @@ function normalize(s: string): string {
 }
 
 function profileFingerprint(p: LearnerProfile): string {
-  return `${p.familiarity}|${p.goal}|${p.pace}`;
+  // Context + language change the output, so they must change the cache key.
+  return `${p.familiarity}|${p.goal}|${p.pace}|${p.language || "English"}|${(p.context || "").trim()}`;
 }
 
 /** Cache key: sha256(flow:model:promptVersion:normalizedSubject:profileFingerprint). */
@@ -167,16 +178,33 @@ async function getUserId(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
-// Signed-in users get their own (more generous) daily budget on top of the IP cap.
-const USER_LIMIT = { limit: 100, windowSeconds: 86400 };
+// Per-plan base daily generation budget. Referral bonus is added on top.
+// "Daily limits free → refer for more": free users lift their cap by inviting.
+const PLAN_BASE: Record<string, number> = {
+  free_forever: 25,
+  godspeed: 250,
+};
+
+/** Effective daily limit = plan base + referral bonus, read from the profile. */
+async function userDailyLimit(db: SupabaseClient, userId: string): Promise<number> {
+  const { data, error } = await db
+    .from("profiles")
+    .select("plan, bonus_daily")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return PLAN_BASE.free_forever;
+  const base = PLAN_BASE[data.plan as string] ?? PLAN_BASE.free_forever;
+  return base + (data.bonus_daily ?? 0);
+}
 
 async function checkUserRateLimit(userId: string): Promise<boolean> {
   const db = supa();
   if (!db) return true;
+  const limit = await userDailyLimit(db, userId);
   const { data, error } = await db.rpc("check_rate_limit", {
     p_id: `user:${userId}:day`,
-    p_limit: USER_LIMIT.limit,
-    p_window_seconds: USER_LIMIT.windowSeconds,
+    p_limit: limit,
+    p_window_seconds: 86400,
   });
   if (error) {
     console.error("user rate_limit rpc error:", error.message);

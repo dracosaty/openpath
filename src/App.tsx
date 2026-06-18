@@ -10,7 +10,11 @@ import {
   listRoadmaps,
   loadProgress,
   setNodeComplete,
+  getMyProfile,
+  updateMyPersonalization,
+  redeemReferral,
   type SavedRoadmap,
+  type UserProfile,
 } from "./lib/db";
 import { fetchPublicRoadmap } from "./lib/public";
 import Explore from "./views/Explore";
@@ -20,6 +24,9 @@ import ComingSoon from "./views/ComingSoon";
 import CalibrationModal from "./components/CalibrationModal";
 import AuthModal from "./components/AuthModal";
 import ShareSheet from "./components/ShareSheet";
+import InviteModal from "./components/InviteModal";
+
+const REF_KEY = "openpath_pending_ref";
 
 export default function App() {
   const { session } = useSession();
@@ -34,12 +41,17 @@ export default function App() {
   const [saved, setSaved] = useState<SavedRoadmap[]>([]);
   const [publicRoadmap, setPublicRoadmap] = useState<Roadmap | null>(null);
   const [share, setShare] = useState<"share" | "complete" | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Handle shared links (?r=<id>) and topic-seeded links (?topic=...) on load.
+  // Handle shared links (?r=<id>), topic-seeded links (?topic=...), and
+  // referral links (?ref=<code>) on load.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("r");
     const topic = params.get("topic");
+    const ref = params.get("ref");
+    if (ref) localStorage.setItem(REF_KEY, ref); // redeemed after sign-in
     if (r) {
       fetchPublicRoadmap(r).then((rm) => rm && setPublicRoadmap(rm));
     } else if (topic) {
@@ -47,6 +59,22 @@ export default function App() {
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, []);
+
+  // On sign-in: load profile and redeem any pending referral code.
+  useEffect(() => {
+    if (!session) {
+      setProfile(null);
+      return;
+    }
+    (async () => {
+      const pendingRef = localStorage.getItem(REF_KEY);
+      if (pendingRef) {
+        await redeemReferral(pendingRef);
+        localStorage.removeItem(REF_KEY);
+      }
+      setProfile(await getMyProfile());
+    })();
+  }, [session]);
 
   function clearUrl() {
     window.history.replaceState(null, "", window.location.pathname);
@@ -82,6 +110,10 @@ export default function App() {
       const id = await saveRoadmap(rm);
       setRoadmapDbId(id);
       refreshSaved();
+      // Remember personalization for next time.
+      if (session && (profile.context || profile.language)) {
+        updateMyPersonalization(profile.context ?? "", profile.language ?? "English");
+      }
     } catch {
       setError("Something went wrong while generating. Please try again.");
     } finally {
@@ -146,6 +178,9 @@ export default function App() {
         <div className="nav-right">
           {!authEnabled ? null : session ? (
             <>
+              <span className="nav-link" onClick={() => setInviteOpen(true)} title="Invite friends for more daily generations">
+                🎁 Invite
+              </span>
               <span className="nav-link" style={{ opacity: 0.7 }}>
                 {session.user.email}
               </span>
@@ -226,12 +261,16 @@ export default function App() {
       {pendingTopic && (
         <CalibrationModal
           topic={pendingTopic}
+          initialContext={profile?.context ?? ""}
+          initialLanguage={profile?.language ?? "English"}
           onCancel={() => setPendingTopic(null)}
-          onDone={(profile) => runGeneration(pendingTopic, profile)}
+          onDone={(p) => runGeneration(pendingTopic, p)}
         />
       )}
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+
+      {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
 
       {share && roadmap && (
         <ShareSheet

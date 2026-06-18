@@ -37,6 +37,73 @@ export async function saveRoadmap(roadmap: Roadmap): Promise<string | null> {
   return data.id;
 }
 
+export interface UserProfile {
+  referral_code: string;
+  bonus_daily: number;
+  plan: string;
+  context: string | null;
+  language: string;
+}
+
+/** Load the signed-in user's profile (personalization + referral state). */
+export async function getMyProfile(): Promise<UserProfile | null> {
+  if (!supabase) return null;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("referral_code, bonus_daily, plan, context, language")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (error) {
+    console.error("getMyProfile:", error.message);
+    return null;
+  }
+  return data as UserProfile | null;
+}
+
+/** Save personalization context/language back to the profile for reuse. */
+export async function updateMyPersonalization(
+  context: string,
+  language: string,
+): Promise<void> {
+  if (!supabase) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+  const { error } = await supabase
+    .from("profiles")
+    .update({ context: context || null, language: language || "English" })
+    .eq("id", auth.user.id);
+  if (error) console.error("updateMyPersonalization:", error.message);
+}
+
+/** Redeem a referral code (grants bonus quota to both parties, once). */
+export async function redeemReferral(code: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc("redeem_referral", { p_code: code });
+  if (error) {
+    console.error("redeemReferral:", error.message);
+    return false;
+  }
+  return !!(data as any)?.ok;
+}
+
+export interface ReferralStats {
+  count: number;
+  bonus: number;
+  code: string | null;
+}
+
+export async function getReferralStats(): Promise<ReferralStats | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("my_referral_stats");
+  if (error) {
+    console.error("getReferralStats:", error.message);
+    return null;
+  }
+  return data as ReferralStats;
+}
+
 /** Mark a roadmap public so it can be shared by link. Returns success. */
 export async function makeRoadmapPublic(id: string): Promise<boolean> {
   if (!supabase) return false;

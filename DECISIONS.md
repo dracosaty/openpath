@@ -8,6 +8,15 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - **Mock modules:** Proctoring *and* blockchain credentials descoped to "coming soon" stubs for v1.
 - **Scale/budget:** Tiny / free-tier only → aggressive caching, tight per-IP limits.
 
+## Growth — referrals + personalization + multilingual (this commit)
+From the founder's notebook ("daily limits free → refer for more", resume/LinkedIn
+personalization, curriculum/India, multilingual). Triage + what shipped:
+- **Referral quota = virality engine.** Migration `0004`: `profiles` (referral_code, bonus_daily, plan, context, language), `referrals`, a signup trigger that auto-creates a profile with a unique code, and SECURITY DEFINER `redeem_referral()` (grants +10/day to BOTH parties, once) + `my_referral_stats()`. Per-user daily limit is now `PLAN_BASE[plan] + bonus_daily` (free_forever=25, godspeed=250). Verified: limit math reads the profile. `?ref=<code>` captured to localStorage, redeemed after sign-in. Invite modal = a built-in share surface.
+- **Personalization (resume/context + language).** `LearnerProfile` gains optional `context` + `language`; `formatProfile` injects "skip what you already know / target gaps" and a language directive; both are in the cache key (different context/lang → different cache). Calibration modal gains an optional background textarea (prefilled/saved to profile for signed-in users) and a 16-language selector (India-first). Verified prompt injection.
+- **Plan tiers: scaffolded, not monetized.** `plan` column + per-plan base limits exist; no payments (out of Phase-1 scope). "godspeed" is just a higher cap for now. **[NEEDS INPUT]** pricing + whether to add Stripe later.
+- **Curriculum/India + class 6–PhD:** served via the free-text context ("CBSE class 10") rather than a bespoke selector. **[NEEDS INPUT]** whether a dedicated board/exam picker is worth it.
+- Per-referral bonus (10) is duplicated as a constant in SQL and `InviteModal`; keep them in sync or centralize later.
+
 ## Step 4 + 5 — auth, persistence, feedback (this commit)
 - **Folded Step 5 (feedback) into Step 4** — both need auth + a table; small and cohesive.
 - **Persistence is browser→Supabase under RLS**, not via the functions. This is the standard Supabase pattern and keeps the functions focused on the Anthropic proxy. Migration `0002` adds `roadmaps`, `progress`, `node_feedback`, each with `auth.uid()`-scoped policies. `node_feedback` has insert-only policy (admin reads via service role).

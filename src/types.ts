@@ -4,11 +4,15 @@
 
 export type View = "home" | "roadmap" | "exam" | "vault";
 
-/** The 3 calibration answers that personalise every generation. */
+/** The calibration answers + optional context that personalise every generation. */
 export interface LearnerProfile {
   familiarity: string;
   goal: string;
   pace: string;
+  /** Optional free-text background (resume / current level / curriculum, e.g. "CBSE class 10"). */
+  context?: string;
+  /** Output language for roadmap + lessons. Defaults to English. */
+  language?: string;
 }
 
 export interface DiagramItem {
