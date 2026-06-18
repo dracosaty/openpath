@@ -8,6 +8,13 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - **Mock modules:** Proctoring *and* blockchain credentials descoped to "coming soon" stubs for v1.
 - **Scale/budget:** Tiny / free-tier only → aggressive caching, tight per-IP limits.
 
+## Retention — spaced-repetition review (this commit)
+- **The retention lever.** Quiz questions answered in lessons become review cards, re-surfaced on a pruned **SM-2** schedule. Migration `0005`: `review_items` (ease/interval/repetitions/due_at, unique per user+node+question), RLS own-rows.
+- **Works for everyone:** `src/lib/review.ts` is a unified store — Supabase when signed in (cross-device), **localStorage when signed out** (device-local) — so review doesn't require an account. Same shape both sides.
+- **3-grade UI** (Again/Good/Easy) instead of SM-2's 0–5, one tap. `src/lib/srs.ts` is pure + unit-tested (1→6→15-day progression, ease floor 1.3, lapse → 10-min relearn, easy > good). Grade buttons show the next interval ("Good · 1 day").
+- **Nav "Review" badge** with due count = a daily reason to return. Cards enqueued on quiz answer in the lesson panel.
+- **[NEEDS INPUT]** signed-out localStorage reviews don't migrate into the account on sign-in yet (a future merge step). Acceptable for now.
+
 ## Growth — referrals + personalization + multilingual (this commit)
 From the founder's notebook ("daily limits free → refer for more", resume/LinkedIn
 personalization, curriculum/India, multilingual). Triage + what shipped:

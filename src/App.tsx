@@ -25,6 +25,8 @@ import CalibrationModal from "./components/CalibrationModal";
 import AuthModal from "./components/AuthModal";
 import ShareSheet from "./components/ShareSheet";
 import InviteModal from "./components/InviteModal";
+import ReviewView from "./views/ReviewView";
+import { getReviewCounts } from "./lib/review";
 
 const REF_KEY = "openpath_pending_ref";
 
@@ -43,6 +45,11 @@ export default function App() {
   const [share, setShare] = useState<"share" | "complete" | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [dueCount, setDueCount] = useState(0);
+
+  const refreshReviewCount = useCallback(() => {
+    getReviewCounts().then((c) => setDueCount(c.due));
+  }, []);
 
   // Handle shared links (?r=<id>), topic-seeded links (?topic=...), and
   // referral links (?ref=<code>) on load.
@@ -94,6 +101,11 @@ export default function App() {
   useEffect(() => {
     refreshSaved();
   }, [refreshSaved]);
+
+  // Keep the review due-count fresh as the user signs in / navigates.
+  useEffect(() => {
+    refreshReviewCount();
+  }, [session, view, refreshReviewCount]);
 
   async function runGeneration(topic: string, profile: LearnerProfile) {
     setPendingTopic(null);
@@ -173,6 +185,27 @@ export default function App() {
         </div>
         {navItem("home", "Explore")}
         {navItem("roadmap", "My Roadmap", hasRoadmapNav)}
+        <span
+          className={`nav-link ${view === "review" ? "active" : ""}`}
+          onClick={() => setView("review")}
+        >
+          Review
+          {dueCount > 0 && (
+            <span
+              style={{
+                marginLeft: 6,
+                background: "var(--accent)",
+                color: "#fff",
+                borderRadius: 999,
+                padding: "1px 7px",
+                fontSize: 11,
+                fontWeight: 800,
+              }}
+            >
+              {dueCount}
+            </span>
+          )}
+        </span>
         {navItem("exam", "Exams")}
         {navItem("vault", "Credentials")}
         <div className="nav-right">
@@ -224,6 +257,10 @@ export default function App() {
         <>
           {!generating && view === "home" && (
             <Explore onStart={setPendingTopic} onOpenPreset={openPreset} />
+          )}
+
+          {view === "review" && (
+            <ReviewView onBack={() => setView("home")} onChanged={refreshReviewCount} />
           )}
 
           {!generating && view === "roadmap" && (

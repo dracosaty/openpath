@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { generateLesson, generateDeeper } from "../lib/ai";
 import { submitFeedback } from "../lib/db";
+import { enqueueReviews } from "../lib/review";
 import { authEnabled } from "../lib/supabase";
 import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic } from "../types";
 import Diagram from "./Diagram";
@@ -137,7 +138,22 @@ export default function LessonPanel({
                       <button
                         key={opt}
                         className={cls}
-                        onClick={() => setPicked(opt)}
+                        onClick={() => {
+                          setPicked(opt);
+                          // Capture quiz items into spaced-repetition review.
+                          if (lesson?.quiz?.length) {
+                            enqueueReviews(
+                              lesson.quiz.map((q) => ({
+                                roadmapId: roadmapDbId,
+                                nodeId: node.id,
+                                nodeTitle: node.title,
+                                question: q.q,
+                                options: q.options,
+                                answer: q.answer,
+                              })),
+                            );
+                          }
+                        }}
                         disabled={picked !== null}
                       >
                         {opt}

@@ -2,7 +2,7 @@
 // These mirror the JSON shapes the AI flows return so the same types are
 // used by the views, the AI client, and (later) the serverless functions.
 
-export type View = "home" | "roadmap" | "exam" | "vault";
+export type View = "home" | "roadmap" | "review" | "exam" | "vault";
 
 /** The calibration answers + optional context that personalise every generation. */
 export interface LearnerProfile {
