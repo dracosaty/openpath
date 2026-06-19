@@ -37,8 +37,8 @@ export default async (req: Request, context: Context): Promise<Response> => {
     flow: "deeper",
     subject: `${pathTitle} :: ${nodeTitle}`,
     profile,
-    produce: async () => {
-      const arr = await callClaude(userPrompt, system, 1000);
+    produce: async (apiKey?: string) => {
+      const arr = await callClaude(userPrompt, system, 1000, apiKey);
       const t = Date.now();
       return (Array.isArray(arr) ? arr : [])
         .slice(0, 3)

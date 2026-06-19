@@ -50,8 +50,8 @@ Return ONLY:
     flow: "roadmap",
     subject: topic,
     profile,
-    produce: async () => {
-      const r = await callClaude(userPrompt, system, 1500);
+    produce: async (apiKey?: string) => {
+      const r = await callClaude(userPrompt, system, 1500, apiKey);
       const t = Date.now();
       // Post-process into our Roadmap shape, assigning stable ids (ported from prototype).
       return {

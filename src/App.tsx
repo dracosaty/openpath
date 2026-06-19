@@ -26,7 +26,9 @@ import AuthModal from "./components/AuthModal";
 import ShareSheet from "./components/ShareSheet";
 import InviteModal from "./components/InviteModal";
 import ReviewView from "./views/ReviewView";
+import ByokModal from "./components/ByokModal";
 import { getReviewCounts } from "./lib/review";
+import { hasApiKey } from "./lib/byok";
 
 const REF_KEY = "openpath_pending_ref";
 
@@ -45,6 +47,8 @@ export default function App() {
   const [share, setShare] = useState<"share" | "complete" | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [byokOpen, setByokOpen] = useState(false);
+  const [byokActive, setByokActive] = useState(hasApiKey());
   const [dueCount, setDueCount] = useState(0);
 
   const refreshReviewCount = useCallback(() => {
@@ -126,8 +130,14 @@ export default function App() {
       if (session && (profile.context || profile.language)) {
         updateMyPersonalization(profile.context ?? "", profile.language ?? "English");
       }
-    } catch {
-      setError("Something went wrong while generating. Please try again.");
+    } catch (e: any) {
+      if (String(e?.message).includes("429")) {
+        setError(
+          "You've hit today's free limit. Invite friends for more, or add your own API key for unlimited use.",
+        );
+      } else {
+        setError("Something went wrong while generating. Please try again.");
+      }
     } finally {
       setGenerating(false);
     }
@@ -209,6 +219,14 @@ export default function App() {
         {navItem("exam", "Exams")}
         {navItem("vault", "Credentials")}
         <div className="nav-right">
+          <span
+            className="nav-link"
+            onClick={() => setByokOpen(true)}
+            title="Use your own API key for unlimited usage"
+            style={byokActive ? { color: "var(--accent)", fontWeight: 800 } : {}}
+          >
+            {byokActive ? "∞ Unlimited" : "🔑 Unlimited"}
+          </span>
           {!authEnabled ? null : session ? (
             <>
               <span className="nav-link" onClick={() => setInviteOpen(true)} title="Invite friends for more daily generations">
@@ -308,6 +326,10 @@ export default function App() {
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
+
+      {byokOpen && (
+        <ByokModal onClose={() => setByokOpen(false)} onChange={() => setByokActive(hasApiKey())} />
+      )}
 
       {share && roadmap && (
         <ShareSheet

@@ -33,13 +33,15 @@ Adapt vocabulary, depth and examples to this profile. A complete beginner gets p
   return s;
 }
 
-/** Calls Claude and parses the JSON out of the response. Mirrors the prototype's b(). */
+/** Calls Claude and parses the JSON out of the response. Mirrors the prototype's b().
+ *  apiKeyOverride is a user's BYOK key, used transiently and never stored/logged. */
 export async function callClaude(
   userPrompt: string,
   system: string,
   maxTokens = 1000,
+  apiKeyOverride?: string,
 ): Promise<any> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = apiKeyOverride || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
   const res = await fetch(ANTHROPIC_URL, {
@@ -130,6 +132,14 @@ function profileFingerprint(p: LearnerProfile): string {
 function cacheKey(flow: string, subject: string, profile: LearnerProfile): string {
   const raw = `${flow}:${MODEL}:${PROMPT_VERSION}:${normalize(subject)}:${profileFingerprint(profile)}`;
   return createHash("sha256").update(raw).digest("hex");
+}
+
+/** BYOK: extract a user's own Anthropic key from the request header.
+ *  Validated for plausible shape; used transiently and NEVER logged or stored. */
+export function getUserApiKey(req: Request): string | undefined {
+  const k = req.headers.get("x-user-anthropic-key")?.trim();
+  if (k && k.startsWith("sk-ant-") && k.length > 20 && k.length < 300) return k;
+  return undefined;
 }
 
 export function getClientIp(req: Request, contextIp?: string): string {
@@ -252,15 +262,21 @@ export async function runGeneration(opts: {
   flow: string;
   subject: string;
   profile: LearnerProfile;
-  produce: () => Promise<any>;
+  produce: (apiKeyOverride?: string) => Promise<any>;
 }): Promise<Response> {
-  if (!(await checkRateLimit(opts.ip))) {
-    return json({ error: "Rate limit exceeded. Please try again later." }, 429);
-  }
-  // Per-user budget for signed-in callers (in addition to the IP cap).
-  const userId = await getUserId(opts.req);
-  if (userId && !(await checkUserRateLimit(userId))) {
-    return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
+  // BYOK: a user-supplied key (browser-only, never stored/logged here) means
+  // they pay for their own usage → unlimited, so we skip rate limiting.
+  const byok = getUserApiKey(opts.req);
+
+  if (!byok) {
+    if (!(await checkRateLimit(opts.ip))) {
+      return json({ error: "Rate limit exceeded. Please try again later." }, 429);
+    }
+    // Per-user budget for signed-in callers (in addition to the IP cap).
+    const userId = await getUserId(opts.req);
+    if (userId && !(await checkUserRateLimit(userId))) {
+      return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
+    }
   }
 
   const key = cacheKey(opts.flow, opts.subject, opts.profile);
@@ -274,7 +290,7 @@ export async function runGeneration(opts: {
   }
 
   try {
-    const value = await opts.produce();
+    const value = await opts.produce(byok);
     await cacheSet(key, opts.flow, value);
     return new Response(JSON.stringify(value), {
       status: 200,

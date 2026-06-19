@@ -112,6 +112,13 @@ keyed on `auth.uid()` so a user only ever sees their own rows.
 2. Add the env vars above in **Site settings → Environment variables**.
 3. Deploy. `/api/*` is rewritten to the functions automatically.
 
+## BYOK (bring your own key)
+Users can paste their own Anthropic API key (nav → **🔑 Unlimited**) for
+unlimited usage beyond the free daily limit. The key is stored **only in the
+browser** (localStorage), sent per-request in the `X-User-Anthropic-Key` header,
+used transiently by the function, and **never stored or logged** server-side.
+BYOK requests skip rate limiting (self-funded) but still use the cache.
+
 ## Descoped for v1 (intentionally mocked)
 - **Proctored exams** and **blockchain credentials** are "coming soon" stubs
   (`src/views/ComingSoon.tsx`). The original mock UIs are kept in `_prototype/`.

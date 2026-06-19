@@ -8,6 +8,13 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - **Mock modules:** Proctoring *and* blockchain credentials descoped to "coming soon" stubs for v1.
 - **Scale/budget:** Tiny / free-tier only → aggressive caching, tight per-IP limits.
 
+## BYOK — bring your own AI key (this commit)
+- **Unlimited usage** via a user-supplied Anthropic key, on top of free daily limits.
+- **Security:** key lives ONLY in the browser (`localStorage`), sent per-request in `X-User-Anthropic-Key` over HTTPS, used transiently by the function, **never stored or logged** server-side. `getUserApiKey()` validates the `sk-ant-` shape; anything malformed is ignored (falls back to platform key + limits). Verified: valid key works with NO platform key and **skips rate limiting**; garbage key still rate-limited.
+- BYOK still uses the cache (saves the user's tokens on repeats) and still populates it (benefits everyone).
+- UI: `ByokModal` (paste/remove key, privacy note, "get a key" link) from a nav entry that shows `🔑 Unlimited` → `∞ Unlimited` when active. Available without an account. A 429 now suggests inviting friends or adding a key.
+- **[NOTE]** the function does see the key in-flight (unavoidable when proxying); we never persist/log it. A fully zero-knowledge path (browser → Anthropic direct) would lose caching + reintroduce the browser-CORS issue, so we didn't.
+
 ## Retention — spaced-repetition review (this commit)
 - **The retention lever.** Quiz questions answered in lessons become review cards, re-surfaced on a pruned **SM-2** schedule. Migration `0005`: `review_items` (ease/interval/repetitions/due_at, unique per user+node+question), RLS own-rows.
 - **Works for everyone:** `src/lib/review.ts` is a unified store — Supabase when signed in (cross-device), **localStorage when signed out** (device-local) — so review doesn't require an account. Same shape both sides.

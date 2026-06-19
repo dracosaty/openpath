@@ -7,6 +7,7 @@ import type {
 import { generateStubRoadmap, generateStubLesson, generateStubDeeper } from "./stub";
 import { findPreset } from "../data/presetData";
 import { supabase } from "./supabase";
+import { getApiKey } from "./byok";
 
 // The Netlify Functions (/api/generate-*) hold the Anthropic key server-side.
 // The stub remains the default so `npm run dev` works with no key; set
@@ -20,6 +21,9 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
     const { data } = await supabase.auth.getSession();
     if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
   }
+  // BYOK: forward the user's own key (browser-only) for unlimited, self-funded use.
+  const byok = getApiKey();
+  if (byok) headers["X-User-Anthropic-Key"] = byok;
   const res = await fetch(path, {
     method: "POST",
     headers,
