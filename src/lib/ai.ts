@@ -17,7 +17,9 @@ const USE_STUB = import.meta.env.PROD
   ? import.meta.env.VITE_USE_STUB === "true"
   : import.meta.env.VITE_USE_STUB !== "false";
 
-async function postJSON<T>(path: string, body: unknown): Promise<T> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function postJSON<T>(path: string, body: unknown, attempt = 0): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   // Attach the session token so the backend can apply per-user rate limits.
   if (supabase) {
@@ -27,13 +29,25 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
   // BYOK: forward the user's own key (browser-only) for unlimited, self-funded use.
   const byok = getApiKey();
   if (byok) headers["X-User-Anthropic-Key"] = byok;
-  const res = await fetch(path, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json() as Promise<T>;
+
+  let res: Response;
+  try {
+    res = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  } catch {
+    if (attempt < 2) {
+      await sleep(500);
+      return postJSON<T>(path, body, attempt + 1);
+    }
+    throw new Error("Network error");
+  }
+  if (res.ok) return res.json() as Promise<T>;
+  // The free model endpoint is high-variance; a slow request that times out
+  // (5xx) usually succeeds on a fresh attempt. Don't retry 429 (rate limit).
+  if (res.status >= 500 && attempt < 2) {
+    await sleep(500);
+    return postJSON<T>(path, body, attempt + 1);
+  }
+  throw new Error(`API ${res.status}`);
 }
 
 export async function generateRoadmap(
