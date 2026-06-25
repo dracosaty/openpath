@@ -15,6 +15,12 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - UI: `ByokModal` (paste/remove key, privacy note, "get a key" link) from a nav entry that shows `🔑 Unlimited` → `∞ Unlimited` when active. Available without an account. A 429 now suggests inviting friends or adding a key.
 - **[NOTE]** the function does see the key in-flight (unavoidable when proxying); we never persist/log it. A fully zero-knowledge path (browser → Anthropic direct) would lose caching + reintroduce the browser-CORS issue, so we didn't.
 
+## Provider latency + deploy gotchas (live debugging notes)
+- **The nemotron *reasoning* model in the user's snippet is unusable for sync functions** — 20–60s+ latency vs Netlify's ~10s function timeout → 502s. Switched the default to **`meta/llama-3.1-8b-instruct`** on the same NVIDIA endpoint/key: ~4s roadmaps, ~7–8s lessons, valid JSON. Verified live (200s). Quality is 8B-level — fine for a free default; users can BYOK Anthropic for higher quality, or we can swap to a better fast model later.
+- Added a 9.5s AbortController in `callNvidia` to fail clean before Netlify's hard kill.
+- **Netlify env-var gotcha:** setting a var via the MCP with `envVarIsSecret:true` + a single scope **silently did not persist** (`getAllEnvVars` returned `[]`). Re-setting with `newVarScopes:["all"]`, `newVarContext:"all"`, non-secret worked. **Function env changes require a redeploy** to take effect. Live `NVIDIA_API_KEY`, `VITE_USE_STUB=false`, `PROMPT_VERSION=v1` are now set.
+- Caching/limits are still OFF in prod until the user adds the Supabase env vars (graceful-degrade: generation works without them, every call is a MISS).
+
 ## Default provider = NVIDIA; desktop scaling (this commit)
 - **Default model for ALL users: NVIDIA's OpenAI-compatible endpoint** (`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`, free), so generation works out of the box with no Anthropic key. `_shared.ts` now has a provider dispatcher: **BYOK Anthropic key → Anthropic** (their cost), else **NVIDIA** (`NVIDIA_API_KEY`), else Anthropic env fallback. `enable_thinking:false` for fast, clean JSON; `max_tokens` floored at 2048 to avoid truncation. Cache key now includes the active model tag so providers don't collide. Verified end-to-end (function → real NVIDIA → valid roadmap).
 - **NVIDIA_API_KEY set on Netlify** (functions scope, secret) + **VITE_USE_STUB=false** (builds) via MCP. ⚠️ The NVIDIA key was provided in chat and lives in Netlify env only — NOT committed. Rotate if it leaks; it's a shared free key.
