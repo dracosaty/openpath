@@ -465,3 +465,43 @@
     padding: 40px 22px;
   }
 }
+
+/* ---------- large desktop: scale up to use the screen ---------- */
+@media (min-width: 1281px) {
+  .section,
+  .browse,
+  .cta-band,
+  .footer-inner {
+    max-width: 1200px;
+  }
+  .hero {
+    max-width: 940px;
+    padding-top: 96px;
+  }
+  .rm-page {
+    max-width: 1220px;
+  }
+}
+@media (min-width: 1660px) {
+  .section,
+  .browse,
+  .cta-band,
+  .footer-inner {
+    max-width: 1320px;
+  }
+  .feature-grid,
+  .community-grid {
+    gap: 20px;
+  }
+}
+
+/* keep a long email from blowing out the desktop nav */
+.nav-email {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-drawer .nav-email {
+  max-width: none;
+}

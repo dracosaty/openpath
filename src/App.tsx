@@ -255,7 +255,7 @@ export default function App() {
           >
             🎁 Invite
           </span>
-          <span className="nav-link" style={{ opacity: 0.7 }}>
+          <span className="nav-link nav-email" style={{ opacity: 0.7 }}>
             {session.user.email}
           </span>
           <span

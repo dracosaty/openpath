@@ -13,11 +13,30 @@ export interface LearnerProfile {
   language?: string;
 }
 
+// ── Model providers ─────────────────────────────────────────────────
+// DEFAULT for all users: NVIDIA's OpenAI-compatible endpoint (free) — set
+// NVIDIA_API_KEY in env. BYOK users bring an Anthropic key (sk-ant-…) which
+// takes precedence for their own requests. ANTHROPIC_API_KEY (platform) is an
+// optional fallback if NVIDIA isn't configured.
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-// Using Haiku (fastest + cheapest Claude model) for cost-efficient generation.
-// This is Claude (Anthropic) — set ANTHROPIC_API_KEY in Netlify env vars.
-// Bump deliberately if you intend to change behavior; cache key includes model.
-export const MODEL = "claude-haiku-4-5-20251001";
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const NVIDIA_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
+
+/** Which model is active for a request — folded into the cache key so outputs
+ *  from different providers don't collide. */
+export function modelTag(byokKey?: string): string {
+  if (byokKey) return "byok-anthropic";
+  if (process.env.NVIDIA_API_KEY) return NVIDIA_MODEL;
+  return ANTHROPIC_MODEL;
+}
+
+/** Strip markdown fences and parse the first JSON object/array out of text. */
+function extractJson(text: string): any {
+  const cleaned = text.replace(/```json\n?|```\n?/g, "").trim();
+  const match = cleaned.match(/[\[{][\s\S]*[\]}]/);
+  return JSON.parse(match ? match[0] : cleaned);
+}
 
 /** Profile → system-prompt fragment. Extends the prototype's x() with optional
  *  background context and output language. */
@@ -33,17 +52,13 @@ Adapt vocabulary, depth and examples to this profile. A complete beginner gets p
   return s;
 }
 
-/** Calls Claude and parses the JSON out of the response. Mirrors the prototype's b().
- *  apiKeyOverride is a user's BYOK key, used transiently and never stored/logged. */
-export async function callClaude(
+/** Anthropic (Claude) call. Used for BYOK keys and as platform fallback. */
+async function callAnthropic(
   userPrompt: string,
   system: string,
-  maxTokens = 1000,
-  apiKeyOverride?: string,
+  maxTokens: number,
+  apiKey: string,
 ): Promise<any> {
-  const apiKey = apiKeyOverride || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -52,24 +67,70 @@ export async function callClaude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: ANTHROPIC_MODEL,
       max_tokens: maxTokens,
       system,
       messages: [{ role: "user", content: userPrompt }],
     }),
   });
-
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new Error(`Anthropic ${res.status}: ${detail.slice(0, 300)}`);
   }
-
   const data = (await res.json()) as any;
-  let text: string =
-    data.content?.find((c: any) => c.type === "text")?.text ?? "";
-  text = text.replace(/```json\n?|```\n?/g, "").trim();
-  const match = text.match(/[\[{][\s\S]*[\]}]/);
-  return JSON.parse(match ? match[0] : text);
+  const text: string = data.content?.find((c: any) => c.type === "text")?.text ?? "";
+  return extractJson(text);
+}
+
+/** NVIDIA OpenAI-compatible call (default provider for all users). */
+async function callNvidia(
+  userPrompt: string,
+  system: string,
+  maxTokens: number,
+): Promise<any> {
+  const res = await fetch(NVIDIA_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: NVIDIA_MODEL,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.6,
+      top_p: 0.95,
+      // headroom so larger JSON (full roadmaps) never truncates mid-object
+      max_tokens: Math.max(maxTokens, 2048),
+      chat_template_kwargs: { enable_thinking: false },
+      stream: false,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`NVIDIA ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as any;
+  const text: string = data.choices?.[0]?.message?.content ?? "";
+  return extractJson(text);
+}
+
+/** Provider dispatcher. A BYOK Anthropic key (used transiently, never stored/
+ *  logged) takes precedence; otherwise NVIDIA is the free default for everyone;
+ *  Anthropic env key is the last-resort fallback. Name kept for call sites. */
+export async function callClaude(
+  userPrompt: string,
+  system: string,
+  maxTokens = 1000,
+  byokKey?: string,
+): Promise<any> {
+  if (byokKey) return callAnthropic(userPrompt, system, maxTokens, byokKey);
+  if (process.env.NVIDIA_API_KEY) return callNvidia(userPrompt, system, maxTokens);
+  if (process.env.ANTHROPIC_API_KEY)
+    return callAnthropic(userPrompt, system, maxTokens, process.env.ANTHROPIC_API_KEY);
+  throw new Error("No model provider configured (set NVIDIA_API_KEY or ANTHROPIC_API_KEY)");
 }
 
 // ── Input validation ────────────────────────────────────────────────
@@ -129,8 +190,8 @@ function profileFingerprint(p: LearnerProfile): string {
 }
 
 /** Cache key: sha256(flow:model:promptVersion:normalizedSubject:profileFingerprint). */
-function cacheKey(flow: string, subject: string, profile: LearnerProfile): string {
-  const raw = `${flow}:${MODEL}:${PROMPT_VERSION}:${normalize(subject)}:${profileFingerprint(profile)}`;
+function cacheKey(flow: string, subject: string, profile: LearnerProfile, model: string): string {
+  const raw = `${flow}:${model}:${PROMPT_VERSION}:${normalize(subject)}:${profileFingerprint(profile)}`;
   return createHash("sha256").update(raw).digest("hex");
 }
 
@@ -279,7 +340,7 @@ export async function runGeneration(opts: {
     }
   }
 
-  const key = cacheKey(opts.flow, opts.subject, opts.profile);
+  const key = cacheKey(opts.flow, opts.subject, opts.profile, modelTag(byok));
 
   const cached = await cacheGet(key);
   if (cached) {
