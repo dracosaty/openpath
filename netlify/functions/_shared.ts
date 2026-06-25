@@ -21,7 +21,9 @@ export interface LearnerProfile {
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
 const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const NVIDIA_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
+// Fast instruct model (~4–7s) — fits Netlify's sync function window. The
+// nemotron *reasoning* model from the snippet was far too slow (20–60s+).
+const NVIDIA_MODEL = "meta/llama-3.1-8b-instruct";
 
 /** Which model is active for a request — folded into the cache key so outputs
  *  from different providers don't collide. */
@@ -88,33 +90,40 @@ async function callNvidia(
   system: string,
   maxTokens: number,
 ): Promise<any> {
-  const res = await fetch(NVIDIA_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: NVIDIA_MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.6,
-      top_p: 0.95,
-      // headroom so larger JSON (full roadmaps) never truncates mid-object
-      max_tokens: Math.max(maxTokens, 2048),
-      chat_template_kwargs: { enable_thinking: false },
-      stream: false,
-    }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`NVIDIA ${res.status}: ${detail.slice(0, 300)}`);
+  // Fail fast before Netlify's hard kill so we return a clean error and never
+  // cache a half-written response.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 9500);
+  try {
+    const res = await fetch(NVIDIA_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.6,
+        top_p: 0.95,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`NVIDIA ${res.status}: ${detail.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as any;
+    const text: string = data.choices?.[0]?.message?.content ?? "";
+    return extractJson(text);
+  } finally {
+    clearTimeout(timer);
   }
-  const data = (await res.json()) as any;
-  const text: string = data.choices?.[0]?.message?.content ?? "";
-  return extractJson(text);
 }
 
 /** Provider dispatcher. A BYOK Anthropic key (used transiently, never stored/
