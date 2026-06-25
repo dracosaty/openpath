@@ -1,6 +1,8 @@
 import type { Roadmap } from "../types";
 
-const USE_STUB = import.meta.env.VITE_USE_STUB !== "false";
+const USE_STUB = import.meta.env.PROD
+  ? import.meta.env.VITE_USE_STUB === "true"
+  : import.meta.env.VITE_USE_STUB !== "false";
 
 /**
  * Fetch a publicly-shared roadmap by id (read-only, no auth).

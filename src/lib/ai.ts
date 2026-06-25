@@ -9,10 +9,13 @@ import { findPreset } from "../data/presetData";
 import { supabase } from "./supabase";
 import { getApiKey } from "./byok";
 
-// The Netlify Functions (/api/generate-*) hold the Anthropic key server-side.
-// The stub remains the default so `npm run dev` works with no key; set
-// VITE_USE_STUB=false (e.g. under `netlify dev`) to hit the real backend.
-const USE_STUB = import.meta.env.VITE_USE_STUB !== "false";
+// The Netlify Functions (/api/generate-*) are the real backend.
+// Production ALWAYS uses the real backend (so deploys don't depend on an env
+// flag). Local dev uses the stub by default (no backend needed) — opt out with
+// VITE_USE_STUB=false, or force the stub anywhere with VITE_USE_STUB=true.
+const USE_STUB = import.meta.env.PROD
+  ? import.meta.env.VITE_USE_STUB === "true"
+  : import.meta.env.VITE_USE_STUB !== "false";
 
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
