@@ -15,6 +15,13 @@ Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your
 - UI: `ByokModal` (paste/remove key, privacy note, "get a key" link) from a nav entry that shows `🔑 Unlimited` → `∞ Unlimited` when active. Available without an account. A 429 now suggests inviting friends or adding a key.
 - **[NOTE]** the function does see the key in-flight (unavoidable when proxying); we never persist/log it. A fully zero-knowledge path (browser → Anthropic direct) would lose caching + reintroduce the browser-CORS issue, so we didn't.
 
+## BYOK + redesign — glassmorphism, responsive, landing, social (this commit)
+- **BYOK (bring your own key):** users paste their own Anthropic key for unlimited usage. Stored **only in the browser** (`localStorage`, `src/lib/byok.ts`), sent per-request as `X-User-Anthropic-Key` over HTTPS, used transiently in `callClaude` and **never stored/logged server-side** (`getUserApiKey` validates `sk-ant-` shape). BYOK requests **skip rate limits** (their cost) but still use cache. **Gated behind auth** (`openByok`: requires session in prod; allowed directly only when auth isn't configured at all, i.e. local dev).
+- **Glassmorphism + responsive layer** (`src/glass.css`, loaded after `styles.css`): aurora backdrop, frosted-glass nav/cards/footer over the existing warm-paper palette. Fixed the mobile nav overflow with a **hamburger + glass drawer** (≤880px); responsive hero/gen-box (stacks)/modals/grids at 640/760/880/560 breakpoints. Base design system untouched.
+- **Landing page rebuilt** (`Explore.tsx`): hero (kept animated placeholder) + How-it-works (3 steps) + Features (6 glass cards) + **Community/social section** + Popular presets + dark CTA band + full footer.
+- **Social (mock):** `src/data/community.ts` — 6 shared roadmaps with author + learner counts; clicking opens the read-only `PublicRoadmap` (same conversion loop). Replace with live data later.
+- Verified in preview: desktop sections, mobile drawer (no overflow), BYOK modal, community→public loop, build green.
+
 ## Retention — spaced-repetition review (this commit)
 - **The retention lever.** Quiz questions answered in lessons become review cards, re-surfaced on a pruned **SM-2** schedule. Migration `0005`: `review_items` (ease/interval/repetitions/due_at, unique per user+node+question), RLS own-rows.
 - **Works for everyone:** `src/lib/review.ts` is a unified store — Supabase when signed in (cross-device), **localStorage when signed out** (device-local) — so review doesn't require an account. Same shape both sides.

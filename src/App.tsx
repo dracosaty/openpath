@@ -49,6 +49,7 @@ export default function App() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [byokOpen, setByokOpen] = useState(false);
   const [byokActive, setByokActive] = useState(hasApiKey());
+  const [navOpen, setNavOpen] = useState(false);
   const [dueCount, setDueCount] = useState(0);
 
   const refreshReviewCount = useCallback(() => {
@@ -174,10 +175,24 @@ export default function App() {
     setSaved([]);
   }
 
+  function navTo(v: View, enabled = true) {
+    if (!enabled) return;
+    setView(v);
+    setNavOpen(false);
+  }
+
+  // BYOK is gated behind auth: only signed-in users can attach a key.
+  // (When auth isn't configured at all — local dev — allow it directly.)
+  function openByok() {
+    setNavOpen(false);
+    if (!authEnabled || session) setByokOpen(true);
+    else setAuthOpen(true);
+  }
+
   const navItem = (v: View, label: string, enabled = true) => (
     <span
       className={`nav-link ${view === v ? "active" : ""}`}
-      onClick={() => enabled && setView(v)}
+      onClick={() => navTo(v, enabled)}
       style={enabled ? {} : { opacity: 0.35, cursor: "default" }}
     >
       {label}
@@ -186,66 +201,112 @@ export default function App() {
 
   const hasRoadmapNav = !!roadmap || saved.length > 0;
 
+  const dueBadge = dueCount > 0 && (
+    <span
+      style={{
+        marginLeft: 6,
+        background: "var(--accent)",
+        color: "#fff",
+        borderRadius: 999,
+        padding: "1px 7px",
+        fontSize: 11,
+        fontWeight: 800,
+      }}
+    >
+      {dueCount}
+    </span>
+  );
+
+  const navLinks = (
+    <>
+      {navItem("home", "Explore")}
+      {navItem("roadmap", "My Roadmap", hasRoadmapNav)}
+      <span
+        className={`nav-link ${view === "review" ? "active" : ""}`}
+        onClick={() => navTo("review")}
+      >
+        Review
+        {dueBadge}
+      </span>
+      {navItem("exam", "Exams")}
+      {navItem("vault", "Credentials")}
+    </>
+  );
+
+  const navActions = (
+    <>
+      <span
+        className="nav-link"
+        onClick={openByok}
+        title="Use your own API key for unlimited usage"
+        style={byokActive ? { color: "var(--accent)", fontWeight: 800 } : {}}
+      >
+        {byokActive ? "∞ Unlimited" : "🔑 Unlimited"}
+      </span>
+      {!authEnabled ? null : session ? (
+        <>
+          <span
+            className="nav-link"
+            onClick={() => {
+              setNavOpen(false);
+              setInviteOpen(true);
+            }}
+            title="Invite friends for more daily generations"
+          >
+            🎁 Invite
+          </span>
+          <span className="nav-link" style={{ opacity: 0.7 }}>
+            {session.user.email}
+          </span>
+          <span
+            className="nav-link"
+            onClick={() => {
+              setNavOpen(false);
+              signOut();
+            }}
+          >
+            Sign out
+          </span>
+        </>
+      ) : (
+        <span
+          className="nav-link"
+          onClick={() => {
+            setNavOpen(false);
+            setAuthOpen(true);
+          }}
+        >
+          Sign in
+        </span>
+      )}
+    </>
+  );
+
   return (
     <>
       <nav className="topnav">
-        <div className="brand" onClick={() => setView("home")}>
+        <div className="brand" onClick={() => navTo("home")}>
           <span className="brand-dot" />
           OpenPath
         </div>
-        {navItem("home", "Explore")}
-        {navItem("roadmap", "My Roadmap", hasRoadmapNav)}
-        <span
-          className={`nav-link ${view === "review" ? "active" : ""}`}
-          onClick={() => setView("review")}
+        <div className="nav-desktop">{navLinks}</div>
+        <div className="nav-actions">{navActions}</div>
+        <button
+          className="nav-toggle"
+          aria-label="Menu"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((o) => !o)}
         >
-          Review
-          {dueCount > 0 && (
-            <span
-              style={{
-                marginLeft: 6,
-                background: "var(--accent)",
-                color: "#fff",
-                borderRadius: 999,
-                padding: "1px 7px",
-                fontSize: 11,
-                fontWeight: 800,
-              }}
-            >
-              {dueCount}
-            </span>
-          )}
-        </span>
-        {navItem("exam", "Exams")}
-        {navItem("vault", "Credentials")}
-        <div className="nav-right">
-          <span
-            className="nav-link"
-            onClick={() => setByokOpen(true)}
-            title="Use your own API key for unlimited usage"
-            style={byokActive ? { color: "var(--accent)", fontWeight: 800 } : {}}
-          >
-            {byokActive ? "∞ Unlimited" : "🔑 Unlimited"}
-          </span>
-          {!authEnabled ? null : session ? (
-            <>
-              <span className="nav-link" onClick={() => setInviteOpen(true)} title="Invite friends for more daily generations">
-                🎁 Invite
-              </span>
-              <span className="nav-link" style={{ opacity: 0.7 }}>
-                {session.user.email}
-              </span>
-              <span className="nav-link" onClick={signOut}>
-                Sign out
-              </span>
-            </>
-          ) : (
-            <span className="nav-link" onClick={() => setAuthOpen(true)}>
-              Sign in
-            </span>
-          )}
-        </div>
+          <span className="bars" />
+        </button>
       </nav>
+
+      {navOpen && (
+        <div className="nav-drawer open">
+          {navLinks}
+          {navActions}
+        </div>
+      )}
 
       {error && (
         <div className="toast" role="alert" style={{ margin: "12px auto", maxWidth: 600 }}>
@@ -274,7 +335,14 @@ export default function App() {
       ) : (
         <>
           {!generating && view === "home" && (
-            <Explore onStart={setPendingTopic} onOpenPreset={openPreset} />
+            <Explore
+              onStart={setPendingTopic}
+              onOpenPreset={openPreset}
+              onOpenShared={(rm) => {
+                setPublicRoadmap(rm);
+                window.scrollTo(0, 0);
+              }}
+            />
           )}
 
           {view === "review" && (
