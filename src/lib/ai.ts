@@ -3,11 +3,16 @@ import type {
   Lesson,
   DeeperTopic,
   LearnerProfile,
+  InterviewPrep,
 } from "../types";
-import { generateStubRoadmap, generateStubLesson, generateStubDeeper } from "./stub";
+import {
+  generateStubRoadmap,
+  generateStubLesson,
+  generateStubDeeper,
+  generateStubInterviewPrep,
+} from "./stub";
 import { findPreset } from "../data/presetData";
 import { supabase } from "./supabase";
-import { getApiKey } from "./byok";
 
 // The Netlify Functions (/api/generate-*) are the real backend.
 // Production ALWAYS uses the real backend (so deploys don't depend on an env
@@ -26,10 +31,6 @@ async function postJSON<T>(path: string, body: unknown, attempt = 0): Promise<T>
     const { data } = await supabase.auth.getSession();
     if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
   }
-  // BYOK: forward the user's own key (browser-only) for unlimited, self-funded use.
-  const byok = getApiKey();
-  if (byok) headers["X-User-Anthropic-Key"] = byok;
-
   let res: Response;
   try {
     res = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
@@ -87,4 +88,27 @@ export async function generateDeeper(
     pathTitle,
     profile,
   });
+}
+
+export async function generateInterviewPrep(
+  resume: string,
+  jobDescription: string,
+  targetRole: string,
+  additionalContext: string,
+): Promise<InterviewPrep> {
+  if (USE_STUB) return generateStubInterviewPrep();
+  return postJSON<InterviewPrep>("/api/generate-interview-prep", {
+    mode: "personalized",
+    resume,
+    jobDescription,
+    targetRole,
+    additionalContext,
+  });
+}
+
+/** No resume/JD needed — a quick general prep briefing for a domain, used by
+ *  the "Explore interview topics" browser. */
+export async function generateTopicInterviewPrep(topic: string): Promise<InterviewPrep> {
+  if (USE_STUB) return generateStubInterviewPrep();
+  return postJSON<InterviewPrep>("/api/generate-interview-prep", { mode: "topic", topic });
 }

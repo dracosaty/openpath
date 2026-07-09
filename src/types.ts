@@ -2,7 +2,7 @@
 // These mirror the JSON shapes the AI flows return so the same types are
 // used by the views, the AI client, and (later) the serverless functions.
 
-export type View = "home" | "roadmap" | "review" | "exam" | "vault";
+export type View = "home" | "roadmap" | "review" | "exam" | "vault" | "interview";
 
 /** The calibration answers + optional context that personalise every generation. */
 export interface LearnerProfile {
@@ -78,4 +78,28 @@ export interface Roadmap {
 export interface DeeperTopic {
   id: string;
   title: string;
+}
+
+export interface InterviewQuestion {
+  id: string;
+  category: "Behavioral" | "Technical" | "Role-specific" | "Questions to ask them";
+  q: string;
+  tip: string;
+}
+
+/** A focus area in the study plan: what to learn, before it's turned into a
+ *  full Roadmap (see src/lib/interviewRoadmap.ts). */
+export interface LearningPlanArea {
+  title: string;
+  nodes: string[];
+}
+
+export interface InterviewPrep {
+  matchScore: number;
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  talkingPoints: string[];
+  learningPlan: LearningPlanArea[];
+  questions: InterviewQuestion[];
 }

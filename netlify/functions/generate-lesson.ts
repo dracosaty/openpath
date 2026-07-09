@@ -39,8 +39,8 @@ export default async (req: Request, context: Context): Promise<Response> => {
     // roadmaps doesn't collide in cache.
     subject: `${pathTitle} :: ${nodeTitle}`,
     profile,
-    produce: async (apiKey?: string) => {
-      const i = await callClaude(userPrompt, system, 1100, apiKey);
+    produce: async () => {
+      const i = await callClaude(userPrompt, system, 1100);
       return {
         lessonText: i.lessonText,
         example: i.example,

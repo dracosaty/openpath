@@ -1,4 +1,4 @@
-import type { Roadmap, Lesson, DeeperTopic, LearnerProfile } from "../types";
+import type { Roadmap, Lesson, DeeperTopic, LearnerProfile, InterviewPrep } from "../types";
 
 // Deterministic placeholder generator used while the real backend is being
 // built (Step 1). It fabricates plausibly-shaped content so the full UI loop
@@ -81,3 +81,50 @@ export async function generateStubDeeper(nodeTitle: string): Promise<DeeperTopic
     title: `${nodeTitle} — advanced ${i}`,
   }));
 }
+
+export async function generateStubInterviewPrep(): Promise<InterviewPrep> {
+  await delay(900);
+  const cats: InterviewQuestionCategory[] = [
+    "Behavioral",
+    "Technical",
+    "Role-specific",
+    "Questions to ask them",
+  ];
+  return {
+    matchScore: 74,
+    summary:
+      "Solid overlap on core skills; a couple of the JD's must-haves aren't clearly evidenced yet — worth addressing proactively.",
+    strengths: [
+      "3 years of hands-on experience matching the JD's primary tech stack",
+      "A shipped project demonstrating the exact end-to-end ownership the role asks for",
+      "Cross-functional collaboration experience called out in both resume and JD",
+    ],
+    gaps: [
+      "JD mentions a specific tool/framework not listed on the resume",
+      "No explicit mention of the scale (users/data volume) the JD implies",
+      "Leadership/mentorship expectations in the JD aren't reflected in resume bullets",
+    ],
+    talkingPoints: [
+      "Lead with the shipped project closest to this role's core responsibility",
+      "Frame a past ambiguous-scope project as evidence of the ownership this JD wants",
+    ],
+    learningPlan: [
+      {
+        title: "Placeholder focus area 1",
+        nodes: ["Placeholder concept 1", "Placeholder concept 2", "Placeholder concept 3"],
+      },
+      {
+        title: "Placeholder focus area 2",
+        nodes: ["Placeholder concept 1", "Placeholder concept 2"],
+      },
+    ],
+    questions: cats.map((category, i) => ({
+      id: uid("iq"),
+      category,
+      q: `Sample ${category.toLowerCase()} question ${i + 1} tailored to this resume and role.`,
+      tip: "What this question is really testing (placeholder — real backend personalizes this).",
+    })),
+  };
+}
+
+type InterviewQuestionCategory = InterviewPrep["questions"][number]["category"];

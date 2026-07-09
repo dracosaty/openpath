@@ -14,10 +14,10 @@ export interface LearnerProfile {
 }
 
 // ── Model providers ─────────────────────────────────────────────────
-// DEFAULT for all users: NVIDIA's OpenAI-compatible endpoint (free) — set
-// NVIDIA_API_KEY in env. BYOK users bring an Anthropic key (sk-ant-…) which
-// takes precedence for their own requests. ANTHROPIC_API_KEY (platform) is an
-// optional fallback if NVIDIA isn't configured.
+// DEFAULT for ALL users, always: NVIDIA's OpenAI-compatible endpoint (free) —
+// set NVIDIA_API_KEY in env. No user-supplied keys — one model for everyone.
+// ANTHROPIC_API_KEY (platform-owned, server env only) is a last-resort
+// fallback if NVIDIA isn't configured.
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
 const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -25,12 +25,10 @@ const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 // nemotron *reasoning* model from the snippet was far too slow (20–60s+).
 const NVIDIA_MODEL = "meta/llama-3.1-8b-instruct";
 
-/** Which model is active for a request — folded into the cache key so outputs
- *  from different providers don't collide. */
-export function modelTag(byokKey?: string): string {
-  if (byokKey) return "byok-anthropic";
-  if (process.env.NVIDIA_API_KEY) return NVIDIA_MODEL;
-  return ANTHROPIC_MODEL;
+/** Which model is active — folded into the cache key so a model swap
+ *  self-invalidates instead of serving stale-shaped output. */
+export function modelTag(): string {
+  return process.env.NVIDIA_API_KEY ? NVIDIA_MODEL : ANTHROPIC_MODEL;
 }
 
 /** Strip markdown fences and parse the first JSON object/array out of text. */
@@ -54,7 +52,8 @@ Adapt vocabulary, depth and examples to this profile. A complete beginner gets p
   return s;
 }
 
-/** Anthropic (Claude) call. Used for BYOK keys and as platform fallback. */
+/** Anthropic (Claude) call. Platform-owned fallback only, used when NVIDIA
+ *  isn't configured — never a user-supplied key. */
 async function callAnthropic(
   userPrompt: string,
   system: string,
@@ -126,16 +125,14 @@ async function callNvidia(
   }
 }
 
-/** Provider dispatcher. A BYOK Anthropic key (used transiently, never stored/
- *  logged) takes precedence; otherwise NVIDIA is the free default for everyone;
- *  Anthropic env key is the last-resort fallback. Name kept for call sites. */
+/** Provider dispatcher. NVIDIA is the one model for everyone; the Anthropic
+ *  env key (platform-owned) is a last-resort fallback if NVIDIA isn't
+ *  configured. Name kept as callClaude for call-site continuity. */
 export async function callClaude(
   userPrompt: string,
   system: string,
   maxTokens = 1000,
-  byokKey?: string,
 ): Promise<any> {
-  if (byokKey) return callAnthropic(userPrompt, system, maxTokens, byokKey);
   if (process.env.NVIDIA_API_KEY) return callNvidia(userPrompt, system, maxTokens);
   if (process.env.ANTHROPIC_API_KEY)
     return callAnthropic(userPrompt, system, maxTokens, process.env.ANTHROPIC_API_KEY);
@@ -202,14 +199,6 @@ function profileFingerprint(p: LearnerProfile): string {
 function cacheKey(flow: string, subject: string, profile: LearnerProfile, model: string): string {
   const raw = `${flow}:${model}:${PROMPT_VERSION}:${normalize(subject)}:${profileFingerprint(profile)}`;
   return createHash("sha256").update(raw).digest("hex");
-}
-
-/** BYOK: extract a user's own Anthropic key from the request header.
- *  Validated for plausible shape; used transiently and NEVER logged or stored. */
-export function getUserApiKey(req: Request): string | undefined {
-  const k = req.headers.get("x-user-anthropic-key")?.trim();
-  if (k && k.startsWith("sk-ant-") && k.length > 20 && k.length < 300) return k;
-  return undefined;
 }
 
 export function getClientIp(req: Request, contextIp?: string): string {
@@ -322,6 +311,37 @@ async function cacheSet(key: string, flow: string, value: unknown): Promise<void
 }
 
 /**
+ * Same rate-limiting as runGeneration, but NEVER reads or writes the cache.
+ * For endpoints handling sensitive user-pasted content (e.g. a resume) that
+ * must not be persisted anywhere server-side, even in the derived-output cache.
+ */
+export async function runGenerationNoCache(opts: {
+  req: Request;
+  ip: string;
+  flow: string;
+  produce: () => Promise<any>;
+}): Promise<Response> {
+  if (!(await checkRateLimit(opts.ip))) {
+    return json({ error: "Rate limit exceeded. Please try again later." }, 429);
+  }
+  const userId = await getUserId(opts.req);
+  if (userId && !(await checkUserRateLimit(userId))) {
+    return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
+  }
+
+  try {
+    const value = await opts.produce();
+    return new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "X-OpenPath-Cache": "SKIP" },
+    });
+  } catch (e: any) {
+    console.error(`${opts.flow} failed:`, e?.message);
+    return json({ error: "Generation failed" }, 502);
+  }
+}
+
+/**
  * Wraps a generation: per-IP rate limit → cache lookup → produce → cache store.
  * `subject` is the normalized cache subject (topic for roadmap, node title for
  * lesson/deeper). `produce` does the actual Claude call + post-processing.
@@ -332,24 +352,18 @@ export async function runGeneration(opts: {
   flow: string;
   subject: string;
   profile: LearnerProfile;
-  produce: (apiKeyOverride?: string) => Promise<any>;
+  produce: () => Promise<any>;
 }): Promise<Response> {
-  // BYOK: a user-supplied key (browser-only, never stored/logged here) means
-  // they pay for their own usage → unlimited, so we skip rate limiting.
-  const byok = getUserApiKey(opts.req);
-
-  if (!byok) {
-    if (!(await checkRateLimit(opts.ip))) {
-      return json({ error: "Rate limit exceeded. Please try again later." }, 429);
-    }
-    // Per-user budget for signed-in callers (in addition to the IP cap).
-    const userId = await getUserId(opts.req);
-    if (userId && !(await checkUserRateLimit(userId))) {
-      return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
-    }
+  if (!(await checkRateLimit(opts.ip))) {
+    return json({ error: "Rate limit exceeded. Please try again later." }, 429);
+  }
+  // Per-user budget for signed-in callers (in addition to the IP cap).
+  const userId = await getUserId(opts.req);
+  if (userId && !(await checkUserRateLimit(userId))) {
+    return json({ error: "Daily limit reached. Please try again tomorrow." }, 429);
   }
 
-  const key = cacheKey(opts.flow, opts.subject, opts.profile, modelTag(byok));
+  const key = cacheKey(opts.flow, opts.subject, opts.profile, modelTag());
 
   const cached = await cacheGet(key);
   if (cached) {
@@ -360,7 +374,7 @@ export async function runGeneration(opts: {
   }
 
   try {
-    const value = await opts.produce(byok);
+    const value = await opts.produce();
     await cacheSet(key, opts.flow, value);
     return new Response(JSON.stringify(value), {
       status: 200,

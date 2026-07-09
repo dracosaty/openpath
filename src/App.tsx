@@ -26,9 +26,8 @@ import AuthModal from "./components/AuthModal";
 import ShareSheet from "./components/ShareSheet";
 import InviteModal from "./components/InviteModal";
 import ReviewView from "./views/ReviewView";
-import ByokModal from "./components/ByokModal";
+import InterviewPrepView from "./views/InterviewPrepView";
 import { getReviewCounts } from "./lib/review";
-import { hasApiKey } from "./lib/byok";
 
 const REF_KEY = "openpath_pending_ref";
 
@@ -47,8 +46,6 @@ export default function App() {
   const [share, setShare] = useState<"share" | "complete" | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [byokOpen, setByokOpen] = useState(false);
-  const [byokActive, setByokActive] = useState(hasApiKey());
   const [navOpen, setNavOpen] = useState(false);
   const [dueCount, setDueCount] = useState(0);
 
@@ -133,9 +130,7 @@ export default function App() {
       }
     } catch (e: any) {
       if (String(e?.message).includes("429")) {
-        setError(
-          "You've hit today's free limit. Invite friends for more, or add your own API key for unlimited use.",
-        );
+        setError("You've hit today's free limit. Invite friends for more free generations.");
       } else {
         setError("Something went wrong while generating. Please try again.");
       }
@@ -146,6 +141,18 @@ export default function App() {
 
   function openPreset(p: PresetCard) {
     setPendingTopic(p.title);
+  }
+
+  /** Interview prep hands off a fully-built Roadmap (the "what to learn"
+   *  plan) directly into the normal roadmap/lesson pipeline — same save,
+   *  same progress tracking, same lesson generation as any other roadmap. */
+  async function startLearningPlan(rm: Roadmap) {
+    setRoadmap(rm);
+    setCompleted(new Set());
+    setView("roadmap");
+    const id = await saveRoadmap(rm);
+    setRoadmapDbId(id);
+    refreshSaved();
   }
 
   async function resumeRoadmap(s: SavedRoadmap) {
@@ -181,14 +188,6 @@ export default function App() {
     setNavOpen(false);
   }
 
-  // BYOK is gated behind auth: only signed-in users can attach a key.
-  // (When auth isn't configured at all — local dev — allow it directly.)
-  function openByok() {
-    setNavOpen(false);
-    if (!authEnabled || session) setByokOpen(true);
-    else setAuthOpen(true);
-  }
-
   const navItem = (v: View, label: string, enabled = true) => (
     <span
       className={`nav-link ${view === v ? "active" : ""}`}
@@ -220,6 +219,7 @@ export default function App() {
   const navLinks = (
     <>
       {navItem("home", "Explore")}
+      {navItem("interview", "Interview Prep")}
       {navItem("roadmap", "My Roadmap", hasRoadmapNav)}
       <span
         className={`nav-link ${view === "review" ? "active" : ""}`}
@@ -235,14 +235,6 @@ export default function App() {
 
   const navActions = (
     <>
-      <span
-        className="nav-link"
-        onClick={openByok}
-        title="Use your own API key for unlimited usage"
-        style={byokActive ? { color: "var(--accent)", fontWeight: 800 } : {}}
-      >
-        {byokActive ? "∞ Unlimited" : "🔑 Unlimited"}
-      </span>
       {!authEnabled ? null : session ? (
         <>
           <span
@@ -349,6 +341,10 @@ export default function App() {
             <ReviewView onBack={() => setView("home")} onChanged={refreshReviewCount} />
           )}
 
+          {view === "interview" && (
+            <InterviewPrepView onBack={() => setView("home")} onStartLearningPlan={startLearningPlan} />
+          )}
+
           {!generating && view === "roadmap" && (
             <RoadmapView
               roadmap={roadmap}
@@ -394,10 +390,6 @@ export default function App() {
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
-
-      {byokOpen && (
-        <ByokModal onClose={() => setByokOpen(false)} onChange={() => setByokActive(hasApiKey())} />
-      )}
 
       {share && roadmap && (
         <ShareSheet
