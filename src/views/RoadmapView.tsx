@@ -138,7 +138,7 @@ export default function RoadmapView({
       )}
 
       {roadmap.outcomes?.length > 0 && (
-        <div className="outcomes-banner">
+        <div className="outcomes-banner outcomes-list">
           <strong>By the end, you'll be able to</strong>
           <ul>
             {roadmap.outcomes.map((o, i) => (
@@ -182,9 +182,12 @@ export default function RoadmapView({
           profile={roadmap.profile}
           isDone={completed.has(openNode.node.id)}
           roadmapDbId={roadmapDbId}
+          phases={roadmap.phases}
+          completed={completed}
           onClose={() => setOpenNode(null)}
           onComplete={() => onComplete(openNode.node.id)}
           onAddDeeper={(topics) => addDeeper(openNode.phaseId, topics)}
+          onNavigate={(node, phaseId) => setOpenNode({ node, phaseId })}
         />
       )}
     </div>

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generateLesson, generateDeeper } from "../lib/ai";
 import { submitFeedback } from "../lib/db";
 import { enqueueReviews } from "../lib/review";
 import { authEnabled } from "../lib/supabase";
-import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic } from "../types";
+import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic, Phase } from "../types";
 import Diagram from "./Diagram";
 
 interface Props {
@@ -12,9 +12,12 @@ interface Props {
   profile: LearnerProfile;
   isDone: boolean;
   roadmapDbId: string | null;
+  phases: Phase[];
+  completed: Set<string>;
   onClose: () => void;
   onComplete: () => void;
   onAddDeeper: (topics: DeeperTopic[]) => void;
+  onNavigate: (node: RoadmapNode, phaseId: string) => void;
 }
 
 export default function LessonPanel({
@@ -23,9 +26,12 @@ export default function LessonPanel({
   profile,
   isDone,
   roadmapDbId,
+  phases,
+  completed,
   onClose,
   onComplete,
   onAddDeeper,
+  onNavigate,
 }: Props) {
   const [lesson, setLesson] = useState<Lesson | null>(node.lesson ?? null);
   const [error, setError] = useState(false);
@@ -34,6 +40,20 @@ export default function LessonPanel({
   const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState("");
   const [reportDone, setReportDone] = useState(false);
+
+  // Flat, ordered view of every node across every phase — lets "liberty to
+  // learn how you want" work both ways: step through sequentially (Prev/
+  // Next) or jump anywhere via the TOC. Recomputed from `phases` so it
+  // stays correct after "Go deeper" appends nodes to a phase.
+  const flat = useMemo(
+    () => phases.flatMap((p) => p.nodes.map((n) => ({ node: n, phaseId: p.id }))),
+    [phases],
+  );
+  const idx = flat.findIndex((f) => f.node.id === node.id);
+  const hasPrev = idx > 0;
+  const hasNext = idx >= 0 && idx < flat.length - 1;
+  const goPrev = () => hasPrev && onNavigate(flat[idx - 1].node, flat[idx - 1].phaseId);
+  const goNext = () => hasNext && onNavigate(flat[idx + 1].node, flat[idx + 1].phaseId);
 
   async function load() {
     setError(false);
@@ -78,19 +98,53 @@ export default function LessonPanel({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <aside className="lesson-panel">
-        <div className="lp-head">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div className="lp-eyebrow">{pathTitle}</div>
-              <h2>{node.title}</h2>
+        <nav className="lp-toc">
+          {phases.map((phase) => (
+            <div key={phase.id} className="lp-toc-phase">
+              <h4>{phase.title}</h4>
+              {phase.nodes.map((n) => (
+                <div
+                  key={n.id}
+                  className={`lp-toc-item ${n.id === node.id ? "active" : ""} ${
+                    completed.has(n.id) ? "done" : ""
+                  }`}
+                  onClick={() => onNavigate(n, phase.id)}
+                >
+                  {completed.has(n.id) && n.id !== node.id ? "✓ " : ""}
+                  {n.title}
+                </div>
+              ))}
             </div>
-            <button className="icon-btn" onClick={onClose} aria-label="Close">
-              ✕
-            </button>
-          </div>
-        </div>
+          ))}
+        </nav>
 
-        <div className="lp-body">
+        <div className="lp-main">
+          <div className="lp-head">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div className="lp-eyebrow">{pathTitle}</div>
+                <h2>{node.title}</h2>
+              </div>
+              <button className="icon-btn" onClick={onClose} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="lp-nav-row">
+              <button className="lp-nav-btn" disabled={!hasPrev} onClick={goPrev}>
+                ← Previous
+              </button>
+              {idx >= 0 && (
+                <span className="lp-nav-progress">
+                  {idx + 1} / {flat.length}
+                </span>
+              )}
+              <button className="lp-nav-btn" disabled={!hasNext} onClick={goNext}>
+                Next →
+              </button>
+            </div>
+          </div>
+
+          <div className="lp-body">
           {!lesson && !error && <p className="modal-sub">Generating lesson…</p>}
 
           {error && (
@@ -104,15 +158,15 @@ export default function LessonPanel({
 
           {lesson && (
             <>
-              <p>{lesson.lessonText}</p>
+              <p className="lesson">{lesson.lessonText}</p>
 
               <h3>Worked example</h3>
-              <p>{lesson.example}</p>
+              <p className="lesson">{lesson.example}</p>
 
               {lesson.diagram && <Diagram d={lesson.diagram} />}
 
               <h3>Key terms</h3>
-              <ul>
+              <ul className="key-terms">
                 {lesson.keyTerms.map((t) => (
                   <li key={t.term}>
                     <strong>{t.term}</strong> — {t.def}
@@ -214,6 +268,7 @@ export default function LessonPanel({
               )}
             </>
           )}
+          </div>
         </div>
       </aside>
     </div>

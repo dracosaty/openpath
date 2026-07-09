@@ -2,6 +2,14 @@
 
 Running log of tradeoffs. Newest first. Items marked **[NEEDS INPUT]** want your call.
 
+## Roadmap/lesson visual fixes + lesson navigation (this commit)
+- **Outcomes-list overlap bug**: `.outcomes-banner` is a 2-col grid reused by 3 other flex-overridden call sites (completion banner, PublicRoadmap CTA, InviteModal stats). Fixed with a scoped `.outcomes-list` modifier class (RoadmapView + PublicRoadmap) instead of touching the base rule — verified via grep that all 5 call sites were found before choosing this over the naive base-rule edit, which would have silently flipped the other 3 to vertical.
+- **Lesson panel never got the glassmorphism pass**: added a bespoke `.lesson-panel{background;backdrop-filter}` override (not the `.glass` utility class, which would have stomped the existing `border-left` via shorthand collision). Activated dormant `.lp-body p.lesson` CSS by adding the missing `className="lesson"`. Styled the previously-unstyled key-terms list.
+- **Diagram.tsx overlap**: flow/cycle items were an unconstrained `flex-wrap` row with no `Box` max-width — wrapped mid-sequence inside the panel's ~504px usable width. Unified flow/cycle/pyramid into one vertical `.diagram-stack` (pyramid already rendered vertically, so its look is unchanged); `comparison`'s 2-col grid is untouched. Added `max-width`/`overflow-wrap` to the shared `Box`.
+- **In-panel Prev/Next + jump-to TOC** (user's "liberty to learn how you want," confirmed via AskUserQuestion — both options chosen): `LessonPanel` now takes `phases`/`completed`/`onNavigate` props, computes a flat ordered node list via `useMemo`, and reuses the existing `useEffect(load,[node.id])` for both step-through and non-linear jumps — no new lesson-loading logic needed. TOC sidebar appears at ≥1024px (280px rail + widened 860px panel); below that, panel keeps its normal single-column layout with just the Prev/Next row added.
+- Verified end-to-end in the browser (stub mode locally — NVIDIA's free tier was rate-throttling this machine's IP again, a recurrence of the [[nvidia-free-tier-silent-throttle]] issue; this was a pure CSS/JSX task so stub content was sufficient and faster): outcomes-list renders correctly, panel reads as frosted glass, diagram shows a clean vertical Input→Process→Output stack with no overlap at both wide and narrow widths, Prev/Next moves sequentially with correct boundary disabling (16/16 → Next disabled), TOC jump works non-linearly (2→13), narrow-width fallback hides the TOC gracefully.
+- Two Explore agents + one Plan agent did the root-cause diagnosis and fix design before any code was touched (used in Plan Mode) — the Plan agent caught both regressions described above that a first-pass fix would have introduced.
+
 ## Phase 1 — locked choices (from handoff Q&A)
 - **Hosting:** Netlify (static SPA + Netlify Functions for the proxy).
 - **Auth + DB:** Supabase (Postgres + Auth + RLS).

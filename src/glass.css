@@ -505,3 +505,218 @@
 .nav-drawer .nav-email {
   max-width: none;
 }
+
+/* ============================================================
+   Roadmap/lesson polish — outcomes-list banner, lesson panel
+   glass treatment, diagram layout, prev/next + TOC navigation.
+   ============================================================ */
+
+/* .outcomes-banner is a 2-col grid (styles.css) reused elsewhere for a
+   flex-overridden CTA/stats row (RoadmapView completion banner,
+   PublicRoadmap CTA, InviteModal stats) — those stay untouched. This
+   modifier only targets the plain heading+list usage. */
+.outcomes-banner.outcomes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 26px;
+}
+.outcomes-list > strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.outcomes-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.outcomes-list li {
+  position: relative;
+  padding-left: 24px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.outcomes-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* Lesson panel — bring it into the glass system (it was skipped during
+   the original glassmorphism pass). Only override background/blur so the
+   existing ink border-left, box-shadow, width and slide-in animation
+   (styles.css) are preserved untouched. */
+.lesson-panel {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+
+.lp-body .key-terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-body .key-terms li {
+  background: var(--paper-2);
+  border: 1px solid var(--ink-08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-60);
+}
+.lp-body .key-terms li strong {
+  color: var(--ink);
+  font-weight: 800;
+  margin-right: 4px;
+}
+
+/* Diagram (flow/cycle/pyramid share a vertical stack; comparison keeps
+   its own 2-col grid above, untouched). Vertical stacking is robust to
+   any item count/label length at the lesson panel's narrow width. */
+.op-diagram {
+  background: var(--paper-2);
+  border: 1px solid var(--ink-08);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.diagram-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.diagram-stack-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.diagram-connector {
+  color: var(--ink-40);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 0;
+}
+.diagram-box {
+  background: var(--node-fill);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 2px 2px 0 var(--ink);
+  text-align: center;
+  min-width: 90px;
+  max-width: 220px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.diagram-box .db-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.diagram-box .db-detail {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-60);
+  margin-top: 3px;
+}
+
+/* Lesson panel Prev/Next + jump-to TOC. TOC is hidden on narrow screens
+   (mobile/tablet) — panel keeps its normal column layout there, just
+   with a Prev/Next row added. On wide screens the panel widens and
+   splits into a TOC rail + main content row. */
+.lp-toc {
+  display: none;
+}
+.lp-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (min-width: 1024px) {
+  .lesson-panel {
+    width: 860px;
+    flex-direction: row;
+  }
+  .lp-toc {
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--glass-border);
+    padding: 20px 16px;
+    overflow-y: auto;
+  }
+}
+.lp-toc-phase {
+  margin-bottom: 18px;
+}
+.lp-toc-phase h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-40);
+  margin: 0 0 8px;
+}
+.lp-toc-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-60);
+}
+.lp-toc-item:hover {
+  background: var(--paper-2);
+}
+.lp-toc-item.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+.lp-toc-item.done:not(.active) {
+  color: var(--accent);
+}
+
+.lp-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.lp-nav-btn {
+  border: 1.5px solid var(--ink-12);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lp-nav-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.lp-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lp-nav-progress {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-40);
+}

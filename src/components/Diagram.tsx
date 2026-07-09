@@ -5,7 +5,7 @@ import type { Diagram as DiagramType } from "../types";
 // dependency-free; styling leans on the ported design tokens.
 export default function Diagram({ d }: { d: DiagramType }) {
   return (
-    <figure className="op-diagram" style={{ margin: "16px 0" }}>
+    <figure className="op-diagram">
       <figcaption
         style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-60)", marginBottom: 10 }}
       >
@@ -18,22 +18,12 @@ export default function Diagram({ d }: { d: DiagramType }) {
           <Col label={d.colB} items={d.items.slice(Math.ceil(d.items.length / 2))} />
         </div>
       ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: d.type === "pyramid" ? "column" : "row",
-            alignItems: "stretch",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="diagram-stack">
           {d.items.map((it, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={i} className="diagram-stack-item">
               <Box label={it.label} detail={it.detail} />
               {i < d.items.length - 1 && d.type !== "pyramid" && (
-                <span style={{ color: "var(--ink-40)", fontWeight: 700 }}>
-                  {d.type === "cycle" ? "↻" : "→"}
-                </span>
+                <span className="diagram-connector">{d.type === "cycle" ? "↻" : "↓"}</span>
               )}
             </div>
           ))}
@@ -45,23 +35,9 @@ export default function Diagram({ d }: { d: DiagramType }) {
 
 function Box({ label, detail }: { label: string; detail?: string }) {
   return (
-    <div
-      style={{
-        background: "var(--node-fill)",
-        border: "1.5px solid var(--ink)",
-        borderRadius: 10,
-        padding: "10px 14px",
-        boxShadow: "2px 2px 0 var(--ink)",
-        textAlign: "center",
-        minWidth: 90,
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
-      {detail && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-60)", marginTop: 3 }}>
-          {detail}
-        </div>
-      )}
+    <div className="diagram-box">
+      <div className="db-label">{label}</div>
+      {detail && <div className="db-detail">{detail}</div>}
     </div>
   );
 }

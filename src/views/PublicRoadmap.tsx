@@ -47,7 +47,7 @@ export default function PublicRoadmap({ roadmap, onCreateOwn, onExplore }: Props
       </div>
 
       {roadmap.outcomes?.length > 0 && (
-        <div className="outcomes-banner">
+        <div className="outcomes-banner outcomes-list">
           <strong>By the end, you'll be able to</strong>
           <ul>
             {roadmap.outcomes.map((o, i) => (
