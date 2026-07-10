@@ -3,6 +3,12 @@ import type { Roadmap, RoadmapNode, DeeperTopic } from "../types";
 import type { SavedRoadmap } from "../lib/db";
 import LessonPanel from "../components/LessonPanel";
 
+/** The phase number is rendered separately (the "01" badge), so strip any
+ *  redundant "Phase 1:" / "Phase 2 -" prefix the model sometimes includes. */
+function cleanPhaseTitle(title: string): string {
+  return title.replace(/^\s*phase\s*\d+\s*[:\-–—.)]?\s*/i, "").trim() || title;
+}
+
 interface Props {
   roadmap: Roadmap | null;
   completed: Set<string>;
@@ -157,21 +163,27 @@ export default function RoadmapView({
       </div>
 
       {roadmap.phases.map((phase, pi) => (
-        <div key={phase.id}>
+        <div key={phase.id} className="rm-phase">
           <div className="phase-label">
-            <span className="phase-num">{pi + 1}</span>
-            {phase.title}
+            <span className="phase-num">{String(pi + 1).padStart(2, "0")}</span>
+            <h2>{cleanPhaseTitle(phase.title)}</h2>
+            <span className="phase-rule" />
           </div>
-          {phase.nodes.map((node) => (
-            <div
-              key={node.id}
-              className={`rm-node ${completed.has(node.id) ? "done" : ""}`}
-              onClick={() => setOpenNode({ node, phaseId: phase.id })}
-            >
-              <span className="rm-node-title">{node.title}</span>
-              {completed.has(node.id) && <span className="check">✓</span>}
-            </div>
-          ))}
+          <div className="rm-node-grid">
+            {phase.nodes.map((node) => {
+              const done = completed.has(node.id);
+              return (
+                <div
+                  key={node.id}
+                  className={`rm-node ${done ? "done" : ""}`}
+                  onClick={() => setOpenNode({ node, phaseId: phase.id })}
+                >
+                  <span className="rm-node-check">{done ? "✓" : ""}</span>
+                  <span className="rm-node-title">{node.title}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
 

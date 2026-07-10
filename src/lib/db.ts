@@ -1,10 +1,10 @@
 import { supabase } from "./supabase";
 import type { Roadmap, RoadmapNode } from "../types";
 
-// Persistence layer. All calls go directly to Supabase from the browser using
-// the user's session; Row-Level Security guarantees a user only ever touches
-// their own rows. Every function no-ops (or returns empty) when there is no
-// configured Supabase / no signed-in user, so the UI works in no-account mode.
+// Persistence layer. When a signed-in Supabase user is present, calls go to
+// Supabase (RLS scopes each user to their own rows). Otherwise everything
+// falls back to this browser's localStorage, so roadmaps + progress survive a
+// refresh and populate "My Roadmap" with no account required (browser mode).
 
 export interface SavedRoadmap {
   id: string;
@@ -14,27 +14,73 @@ export interface SavedRoadmap {
   updated_at: string;
 }
 
-/** Insert a freshly generated roadmap. Returns the new DB id, or null if not saved. */
-export async function saveRoadmap(roadmap: Roadmap): Promise<string | null> {
-  if (!supabase) return null;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
+// ── localStorage fallback (browser mode) ────────────────────────────
+const LS_ROADMAPS = "openpath_roadmaps";
+const LS_PROGRESS = "openpath_progress";
+const isLocal = (id: string) => id.startsWith("local_");
+const localId = () => `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const { data, error } = await supabase
-    .from("roadmaps")
-    .insert({
-      user_id: auth.user.id,
-      topic: roadmap.topic ?? null,
-      title: roadmap.title,
-      data: roadmap,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    console.error("saveRoadmap:", error.message);
-    return null;
+function lsReadRoadmaps(): SavedRoadmap[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_ROADMAPS) || "[]");
+  } catch {
+    return [];
   }
-  return data.id;
+}
+function lsWriteRoadmaps(list: SavedRoadmap[]) {
+  try {
+    localStorage.setItem(LS_ROADMAPS, JSON.stringify(list));
+  } catch (e) {
+    console.error("saveRoadmap(local):", e);
+  }
+}
+function lsReadProgress(): Record<string, string[]> {
+  try {
+    return JSON.parse(localStorage.getItem(LS_PROGRESS) || "{}");
+  } catch {
+    return {};
+  }
+}
+function lsWriteProgress(map: Record<string, string[]>) {
+  try {
+    localStorage.setItem(LS_PROGRESS, JSON.stringify(map));
+  } catch (e) {
+    console.error("setNodeComplete(local):", e);
+  }
+}
+
+/** Insert a freshly generated roadmap. Returns the new id (Supabase when
+ *  signed in, else a local id), or null only if it truly couldn't be saved. */
+export async function saveRoadmap(roadmap: Roadmap): Promise<string | null> {
+  if (supabase) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { data, error } = await supabase
+        .from("roadmaps")
+        .insert({
+          user_id: auth.user.id,
+          topic: roadmap.topic ?? null,
+          title: roadmap.title,
+          data: roadmap,
+        })
+        .select("id")
+        .single();
+      if (!error) return data.id;
+      console.error("saveRoadmap:", error.message);
+    }
+  }
+  // Browser mode: persist to this device's localStorage.
+  const id = localId();
+  const list = lsReadRoadmaps();
+  list.unshift({
+    id,
+    title: roadmap.title,
+    topic: roadmap.topic ?? null,
+    data: roadmap,
+    updated_at: new Date().toISOString(),
+  });
+  lsWriteRoadmaps(list);
+  return id;
 }
 
 export interface UserProfile {
@@ -120,40 +166,58 @@ export async function makeRoadmapPublic(id: string): Promise<boolean> {
 
 /** Persist roadmap mutations (e.g. "go deeper" nodes appended). */
 export async function updateRoadmapData(id: string, roadmap: Roadmap): Promise<void> {
-  if (!supabase) return;
-  const { error } = await supabase
-    .from("roadmaps")
-    .update({ data: roadmap, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) console.error("updateRoadmapData:", error.message);
+  if (supabase && !isLocal(id)) {
+    const { error } = await supabase
+      .from("roadmaps")
+      .update({ data: roadmap, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) console.error("updateRoadmapData:", error.message);
+    return;
+  }
+  const list = lsReadRoadmaps();
+  const i = list.findIndex((r) => r.id === id);
+  if (i >= 0) {
+    list[i] = {
+      ...list[i],
+      title: roadmap.title,
+      topic: roadmap.topic ?? list[i].topic,
+      data: roadmap,
+      updated_at: new Date().toISOString(),
+    };
+    lsWriteRoadmaps(list);
+  }
 }
 
-/** List the signed-in user's saved roadmaps, newest first. */
+/** List saved roadmaps, newest first (Supabase when signed in, else browser). */
 export async function listRoadmaps(): Promise<SavedRoadmap[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("roadmaps")
-    .select("id, title, topic, data, updated_at")
-    .order("updated_at", { ascending: false });
-  if (error) {
-    console.error("listRoadmaps:", error.message);
-    return [];
+  if (supabase) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { data, error } = await supabase
+        .from("roadmaps")
+        .select("id, title, topic, data, updated_at")
+        .order("updated_at", { ascending: false });
+      if (!error) return (data ?? []) as SavedRoadmap[];
+      console.error("listRoadmaps:", error.message);
+    }
   }
-  return (data ?? []) as SavedRoadmap[];
+  return lsReadRoadmaps();
 }
 
 /** Completed node ids for a roadmap. */
 export async function loadProgress(roadmapId: string): Promise<string[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("progress")
-    .select("node_id")
-    .eq("roadmap_id", roadmapId);
-  if (error) {
-    console.error("loadProgress:", error.message);
-    return [];
+  if (supabase && !isLocal(roadmapId)) {
+    const { data, error } = await supabase
+      .from("progress")
+      .select("node_id")
+      .eq("roadmap_id", roadmapId);
+    if (error) {
+      console.error("loadProgress:", error.message);
+      return [];
+    }
+    return (data ?? []).map((r: { node_id: string }) => r.node_id);
   }
-  return (data ?? []).map((r: { node_id: string }) => r.node_id);
+  return lsReadProgress()[roadmapId] ?? [];
 }
 
 export async function setNodeComplete(
@@ -161,26 +225,34 @@ export async function setNodeComplete(
   nodeId: string,
   complete: boolean,
 ): Promise<void> {
-  if (!supabase) return;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return;
+  if (supabase && !isLocal(roadmapId)) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
 
-  if (complete) {
-    const { error } = await supabase
-      .from("progress")
-      .upsert(
-        { user_id: auth.user.id, roadmap_id: roadmapId, node_id: nodeId },
-        { onConflict: "roadmap_id,node_id" },
-      );
-    if (error) console.error("setNodeComplete(insert):", error.message);
-  } else {
-    const { error } = await supabase
-      .from("progress")
-      .delete()
-      .eq("roadmap_id", roadmapId)
-      .eq("node_id", nodeId);
-    if (error) console.error("setNodeComplete(delete):", error.message);
+    if (complete) {
+      const { error } = await supabase
+        .from("progress")
+        .upsert(
+          { user_id: auth.user.id, roadmap_id: roadmapId, node_id: nodeId },
+          { onConflict: "roadmap_id,node_id" },
+        );
+      if (error) console.error("setNodeComplete(insert):", error.message);
+    } else {
+      const { error } = await supabase
+        .from("progress")
+        .delete()
+        .eq("roadmap_id", roadmapId)
+        .eq("node_id", nodeId);
+      if (error) console.error("setNodeComplete(delete):", error.message);
+    }
+    return;
   }
+  const map = lsReadProgress();
+  const set = new Set(map[roadmapId] ?? []);
+  if (complete) set.add(nodeId);
+  else set.delete(nodeId);
+  map[roadmapId] = [...set];
+  lsWriteProgress(map);
 }
 
 /** Feedback hook: per-node "report issue / inaccurate". */

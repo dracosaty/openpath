@@ -6,6 +6,17 @@ import { authEnabled } from "../lib/supabase";
 import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic, Phase } from "../types";
 import Diagram from "./Diagram";
 
+/** The model (or a stale cache entry) doesn't always return `quiz` as an
+ *  array — a single-question quiz can come back as a bare object, which
+ *  crashes `.map()`. The server already normalizes this, but a stale cached
+ *  response predates that fix, so guard here too rather than trust the shape. */
+function normalizeLesson(lesson: Lesson | null | undefined): Lesson | null {
+  if (!lesson) return null;
+  const raw = lesson.quiz as unknown;
+  const quiz = Array.isArray(raw) ? raw : raw ? [raw as Lesson["quiz"][number]] : [];
+  return { ...lesson, quiz };
+}
+
 interface Props {
   node: RoadmapNode;
   pathTitle: string;
@@ -33,8 +44,9 @@ export default function LessonPanel({
   onAddDeeper,
   onNavigate,
 }: Props) {
-  const [lesson, setLesson] = useState<Lesson | null>(node.lesson ?? null);
+  const [lesson, setLesson] = useState<Lesson | null>(normalizeLesson(node.lesson));
   const [error, setError] = useState(false);
+  const [tab, setTab] = useState<"lesson" | "practice">("lesson");
   const [picked, setPicked] = useState<string | null>(null);
   const [loadingDeeper, setLoadingDeeper] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -57,10 +69,10 @@ export default function LessonPanel({
 
   async function load() {
     setError(false);
-    setLesson(node.lesson ?? null);
+    setLesson(normalizeLesson(node.lesson));
     if (node.lesson) return;
     try {
-      setLesson(await generateLesson(node.title, pathTitle, profile));
+      setLesson(normalizeLesson(await generateLesson(node.title, pathTitle, profile)));
     } catch {
       setError(true);
     }
@@ -68,6 +80,7 @@ export default function LessonPanel({
 
   useEffect(() => {
     load();
+    setTab("lesson");
     setPicked(null);
     setReporting(false);
     setReason("");
@@ -158,64 +171,95 @@ export default function LessonPanel({
 
           {lesson && (
             <>
-              <p className="lesson">{lesson.lessonText}</p>
-
-              <h3>Worked example</h3>
-              <p className="lesson">{lesson.example}</p>
-
-              {lesson.diagram && <Diagram d={lesson.diagram} />}
-
-              <h3>Key terms</h3>
-              <ul className="key-terms">
-                {lesson.keyTerms.map((t) => (
-                  <li key={t.term}>
-                    <strong>{t.term}</strong> — {t.def}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="fact-card">
-                <strong>Did you know?</strong> {lesson.funFact}
+              <div className="lp-tabs">
+                <button
+                  className={`lp-tab ${tab === "lesson" ? "active" : ""}`}
+                  onClick={() => setTab("lesson")}
+                >
+                  Lesson
+                </button>
+                <button
+                  className={`lp-tab ${tab === "practice" ? "active" : ""}`}
+                  onClick={() => setTab("practice")}
+                >
+                  Practice
+                </button>
               </div>
 
-              {lesson.quiz?.map((qz, qi) => (
-                <div key={qi} style={{ marginTop: 16 }}>
-                  <p style={{ fontWeight: 700 }}>{qz.q}</p>
-                  {qz.options.map((opt) => {
-                    const isPicked = picked === opt;
-                    const cls = isPicked
-                      ? opt === qz.answer
-                        ? "q-opt correct"
-                        : "q-opt wrong"
-                      : "q-opt";
-                    return (
-                      <button
-                        key={opt}
-                        className={cls}
-                        onClick={() => {
-                          setPicked(opt);
-                          // Capture quiz items into spaced-repetition review.
-                          if (lesson?.quiz?.length) {
-                            enqueueReviews(
-                              lesson.quiz.map((q) => ({
-                                roadmapId: roadmapDbId,
-                                nodeId: node.id,
-                                nodeTitle: node.title,
-                                question: q.q,
-                                options: q.options,
-                                answer: q.answer,
-                              })),
-                            );
-                          }
-                        }}
-                        disabled={picked !== null}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+              {tab === "lesson" ? (
+                <>
+                  <p className="lesson">{lesson.lessonText}</p>
+
+                  <h3>Worked example</h3>
+                  <p className="lesson">{lesson.example}</p>
+
+                  {lesson.diagram && <Diagram d={lesson.diagram} />}
+
+                  <h3>Key terms</h3>
+                  <ul className="key-terms">
+                    {lesson.keyTerms.map((t) => (
+                      <li key={t.term}>
+                        <strong>{t.term}</strong> — {t.def}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button className="btn-dark" style={{ marginTop: 20 }} onClick={() => setTab("practice")}>
+                    Practice what you learned →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="fact-card">
+                    <strong>Did you know?</strong> {lesson.funFact}
+                  </div>
+
+                  {lesson.quiz && lesson.quiz.length > 0 ? (
+                    lesson.quiz.map((qz, qi) => (
+                      <div key={qi} style={{ marginTop: 16 }}>
+                        <p style={{ fontWeight: 700 }}>{qz.q}</p>
+                        {(Array.isArray(qz.options) ? qz.options : []).map((opt) => {
+                          const isPicked = picked === opt;
+                          const cls = isPicked
+                            ? opt === qz.answer
+                              ? "q-opt correct"
+                              : "q-opt wrong"
+                            : "q-opt";
+                          return (
+                            <button
+                              key={opt}
+                              className={cls}
+                              onClick={() => {
+                                setPicked(opt);
+                                // Capture quiz items into spaced-repetition review.
+                                if (lesson?.quiz?.length) {
+                                  enqueueReviews(
+                                    lesson.quiz.map((q) => ({
+                                      roadmapId: roadmapDbId,
+                                      nodeId: node.id,
+                                      nodeTitle: node.title,
+                                      question: q.q,
+                                      options: q.options,
+                                      answer: q.answer,
+                                    })),
+                                  );
+                                }
+                              }}
+                              disabled={picked !== null}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="modal-sub" style={{ marginTop: 16 }}>
+                      No quiz for this lesson — you're all set.
+                    </p>
+                  )}
+                </>
+              )}
 
               <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
                 <button className="btn-dark" disabled={isDone} onClick={onComplete}>

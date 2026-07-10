@@ -27,6 +27,7 @@ import ShareSheet from "./components/ShareSheet";
 import InviteModal from "./components/InviteModal";
 import ReviewView from "./views/ReviewView";
 import InterviewPrepView from "./views/InterviewPrepView";
+import GenLoading from "./components/GenLoading";
 import { getReviewCounts } from "./lib/review";
 
 const REF_KEY = "openpath_pending_ref";
@@ -39,6 +40,7 @@ export default function App() {
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [pendingTopic, setPendingTopic] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genLabel, setGenLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [saved, setSaved] = useState<SavedRoadmap[]>([]);
@@ -95,9 +97,11 @@ export default function App() {
     setView("home");
   }
 
+  // Load saved roadmaps for everyone — Supabase when signed in, this browser's
+  // localStorage otherwise (browser mode). `session` in deps so it refreshes
+  // when the user signs in/out.
   const refreshSaved = useCallback(async () => {
-    if (session) setSaved(await listRoadmaps());
-    else setSaved([]);
+    setSaved(await listRoadmaps());
   }, [session]);
 
   useEffect(() => {
@@ -113,6 +117,7 @@ export default function App() {
     setPendingTopic(null);
     setPublicRoadmap(null);
     clearUrl();
+    setGenLabel(topic);
     setGenerating(true);
     setError(null);
     try {
@@ -306,13 +311,7 @@ export default function App() {
         </div>
       )}
 
-      {generating && (
-        <div className="gen-loading" style={{ textAlign: "center", padding: 40 }}>
-          <p className="modal-sub">
-            Designing a path for your level — usually takes a few seconds.
-          </p>
-        </div>
-      )}
+      {generating && <GenLoading topic={genLabel} />}
 
       {publicRoadmap && !generating ? (
         <PublicRoadmap

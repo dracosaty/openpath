@@ -720,3 +720,145 @@
   font-weight: 700;
   color: var(--ink-40);
 }
+
+/* ---------- roadmap generation loader ---------- */
+.gen-loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 72px 24px 80px;
+  max-width: 620px;
+  margin: 0 auto;
+}
+.gen-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid var(--ink-12);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 28px;
+}
+.gen-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(28px, 5vw, 44px);
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  margin: 0 0 10px;
+}
+.gen-title em {
+  font-style: italic;
+}
+.gen-loading-screen .modal-sub {
+  margin-bottom: 32px;
+}
+.gen-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+.gen-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-40);
+  transition: color 0.3s;
+}
+.gen-step.done,
+.gen-step.active {
+  color: var(--ink);
+}
+.gen-step-dot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--ink-12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  transition: all 0.3s;
+}
+.gen-step.done .gen-step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.gen-step.active .gen-step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* ---------- roadmap phases + node grid ---------- */
+.rm-phase {
+  margin-bottom: 10px;
+}
+.phase-label {
+  margin: 40px 0 20px;
+}
+.phase-label h2 {
+  flex-shrink: 0;
+  margin: 0;
+}
+.phase-num {
+  min-width: 34px;
+  text-align: center;
+  border-radius: 9px;
+  padding: 6px 8px;
+}
+/* rule line filling the row after the phase title */
+.phase-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--ink-12);
+}
+/* two-column node grid with a dashed connector down the left */
+.rm-node-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-left: 16px;
+  padding-left: 24px;
+  border-left: 2px dashed var(--ink-12);
+}
+/* radio circle sits on the LEFT of each node, always visible */
+.rm-node {
+  gap: 12px;
+}
+.rm-node-check {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  transition: all 0.15s;
+}
+.rm-node.done .rm-node-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+@media (max-width: 640px) {
+  .rm-node-grid {
+    grid-template-columns: 1fr;
+    margin-left: 8px;
+    padding-left: 16px;
+  }
+}
