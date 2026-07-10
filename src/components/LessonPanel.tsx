@@ -5,6 +5,7 @@ import { enqueueReviews } from "../lib/review";
 import { authEnabled } from "../lib/supabase";
 import type { Lesson, RoadmapNode, LearnerProfile, DeeperTopic, Phase } from "../types";
 import Diagram from "./Diagram";
+import RichText from "./RichText";
 
 /** The model (or a stale cache entry) doesn't always return `quiz` as an
  *  array — a single-question quiz can come back as a bare object, which
@@ -47,6 +48,8 @@ export default function LessonPanel({
   const [lesson, setLesson] = useState<Lesson | null>(normalizeLesson(node.lesson));
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<"lesson" | "practice">("lesson");
+  // Mobile: the TOC is hidden and opened as a slide-in overlay via this flag.
+  const [tocOpen, setTocOpen] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [loadingDeeper, setLoadingDeeper] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -81,6 +84,7 @@ export default function LessonPanel({
   useEffect(() => {
     load();
     setTab("lesson");
+    setTocOpen(false);
     setPicked(null);
     setReporting(false);
     setReason("");
@@ -111,7 +115,14 @@ export default function LessonPanel({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <aside className="lesson-panel">
-        <nav className="lp-toc">
+        {tocOpen && <div className="lp-toc-veil" onClick={() => setTocOpen(false)} />}
+        <nav className={`lp-toc ${tocOpen ? "open" : ""}`}>
+          <div className="lp-toc-head">
+            <span>Contents</span>
+            <button className="icon-btn" onClick={() => setTocOpen(false)} aria-label="Close contents">
+              ✕
+            </button>
+          </div>
           {phases.map((phase) => (
             <div key={phase.id} className="lp-toc-phase">
               <h4>{phase.title}</h4>
@@ -121,7 +132,10 @@ export default function LessonPanel({
                   className={`lp-toc-item ${n.id === node.id ? "active" : ""} ${
                     completed.has(n.id) ? "done" : ""
                   }`}
-                  onClick={() => onNavigate(n, phase.id)}
+                  onClick={() => {
+                    onNavigate(n, phase.id);
+                    setTocOpen(false);
+                  }}
                 >
                   {completed.has(n.id) && n.id !== node.id ? "✓ " : ""}
                   {n.title}
@@ -143,8 +157,15 @@ export default function LessonPanel({
               </button>
             </div>
             <div className="lp-nav-row">
+              <button
+                className="lp-nav-btn lp-toc-toggle"
+                onClick={() => setTocOpen(true)}
+                aria-label="Open contents"
+              >
+                ☰ Contents
+              </button>
               <button className="lp-nav-btn" disabled={!hasPrev} onClick={goPrev}>
-                ← Previous
+                ← Prev
               </button>
               {idx >= 0 && (
                 <span className="lp-nav-progress">
@@ -188,10 +209,14 @@ export default function LessonPanel({
 
               {tab === "lesson" ? (
                 <>
-                  <p className="lesson">{lesson.lessonText}</p>
+                  <p className="lesson">
+                    <RichText text={lesson.lessonText} />
+                  </p>
 
                   <h3>Worked example</h3>
-                  <p className="lesson">{lesson.example}</p>
+                  <p className="lesson">
+                    <RichText text={lesson.example} />
+                  </p>
 
                   {lesson.diagram && <Diagram d={lesson.diagram} />}
 
@@ -211,7 +236,7 @@ export default function LessonPanel({
               ) : (
                 <>
                   <div className="fact-card">
-                    <strong>Did you know?</strong> {lesson.funFact}
+                    <strong>Did you know?</strong> <RichText text={lesson.funFact} />
                   </div>
 
                   {lesson.quiz && lesson.quiz.length > 0 ? (
