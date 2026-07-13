@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Same-origin API: the SPA calls /api/*, Netlify routes it to the functions.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback so client-side view state survives deep links / refreshes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
