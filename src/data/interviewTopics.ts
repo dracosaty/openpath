@@ -6,7 +6,7 @@ export interface InterviewTopic {
 }
 
 /** Curated domains for the "Explore interview topics" browser — no resume or
- *  JD needed, a quick way to see the kind of prep OpenPath produces. */
+ *  JD needed, a quick way to see the kind of prep ZenWise produces. */
 export const INTERVIEW_TOPICS: InterviewTopic[] = [
   { id: "swe", title: "Software Engineering", icon: "💻", blurb: "Coding, system design, and engineering behavioral rounds." },
   { id: "pm", title: "Product Management", icon: "🧭", blurb: "Product sense, execution, and strategy questions." },

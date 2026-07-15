@@ -20,7 +20,7 @@ export default function InviteModal({ onClose }: Props) {
   const code = stats?.code ?? "";
   const url = code ? `${window.location.origin}/?ref=${code}` : "";
   const text =
-    "I'm using OpenPath to learn anything with free AI roadmaps. Join with my link and we both get more daily generations:";
+    "I'm using ZenWise to learn anything with free AI roadmaps. Join with my link and we both get more daily generations:";
 
   async function onCopy() {
     if (await copyToClipboard(url)) {
@@ -58,7 +58,7 @@ export default function InviteModal({ onClose }: Props) {
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="suggestion-chip" onClick={() => nativeShare(url, "OpenPath", text)}>
+          <button className="suggestion-chip" onClick={() => nativeShare(url, "ZenWise", text)}>
             Share…
           </button>
           {SOCIALS.map((s) => (

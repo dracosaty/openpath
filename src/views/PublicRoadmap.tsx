@@ -17,7 +17,7 @@ export default function PublicRoadmap({ roadmap, onCreateOwn, onExplore }: Props
   return (
     <div className="rm-page">
       <button className="nav-link" onClick={onExplore}>
-        OpenPath — learn anything, free →
+        ZenWise — learn anything, free →
       </button>
 
       <div className="rm-header" style={{ marginTop: 8 }}>

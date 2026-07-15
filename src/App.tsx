@@ -20,7 +20,6 @@ import { fetchPublicRoadmap } from "./lib/public";
 import Explore from "./views/Explore";
 import RoadmapView from "./views/RoadmapView";
 import PublicRoadmap from "./views/PublicRoadmap";
-import ComingSoon from "./views/ComingSoon";
 import CalibrationModal from "./components/CalibrationModal";
 import AuthModal from "./components/AuthModal";
 import ShareSheet from "./components/ShareSheet";
@@ -130,8 +129,8 @@ export default function App() {
       setRoadmapDbId(id);
       refreshSaved();
       // Remember personalization for next time.
-      if (session && (profile.context || profile.language)) {
-        updateMyPersonalization(profile.context ?? "", profile.language ?? "English");
+      if (session && profile.context) {
+        updateMyPersonalization(profile.context, "English");
       }
     } catch (e: any) {
       if (String(e?.message).includes("429")) {
@@ -233,8 +232,6 @@ export default function App() {
         Review
         {dueBadge}
       </span>
-      {navItem("exam", "Exams")}
-      {navItem("vault", "Credentials")}
     </>
   );
 
@@ -284,7 +281,7 @@ export default function App() {
       <nav className="topnav">
         <div className="brand" onClick={() => navTo("home")}>
           <span className="brand-dot" />
-          OpenPath
+          ZenWise
         </div>
         <div className="nav-desktop">{navLinks}</div>
         <div className="nav-actions">{navActions}</div>
@@ -326,14 +323,7 @@ export default function App() {
       ) : (
         <>
           {!generating && view === "home" && (
-            <Explore
-              onStart={setPendingTopic}
-              onOpenPreset={openPreset}
-              onOpenShared={(rm) => {
-                setPublicRoadmap(rm);
-                window.scrollTo(0, 0);
-              }}
-            />
+            <Explore onStart={setPendingTopic} onOpenPreset={openPreset} />
           )}
 
           {view === "review" && (
@@ -360,27 +350,10 @@ export default function App() {
         </>
       )}
 
-      {view === "exam" && (
-        <ComingSoon
-          eyebrow="AI-proctored · Verifiable"
-          title="Proctored Exams"
-          blurb="Prove your skill formally with a proctored assessment. This module is descoped for v1 — see the README for the privacy and consent work it requires first."
-        />
-      )}
-
-      {view === "vault" && (
-        <ComingSoon
-          eyebrow="Blockchain-anchored"
-          title="Credential Vault"
-          blurb="Tamper-proof, verifiable credentials for completed roadmaps. Descoped for v1 while we focus on the core learning loop."
-        />
-      )}
-
       {pendingTopic && (
         <CalibrationModal
           topic={pendingTopic}
           initialContext={profile?.context ?? ""}
-          initialLanguage={profile?.language ?? "English"}
           onCancel={() => setPendingTopic(null)}
           onDone={(p) => runGeneration(pendingTopic, p)}
         />

@@ -1,8 +1,8 @@
-// Shared domain types for OpenPath.
+// Shared domain types for ZenWise.
 // These mirror the JSON shapes the AI flows return so the same types are
 // used by the views, the AI client, and (later) the serverless functions.
 
-export type View = "home" | "roadmap" | "review" | "exam" | "vault" | "interview";
+export type View = "home" | "roadmap" | "review" | "interview";
 
 /** The calibration answers + optional context that personalise every generation. */
 export interface LearnerProfile {
@@ -51,8 +51,10 @@ export interface Lesson {
 export interface RoadmapNode {
   id: string;
   title: string;
-  /** Pre-baked lesson for preset roadmaps; AI-generated lessons are cached separately. */
+  /** Pre-baked (presets) or cached-after-first-generation lesson. */
   lesson?: Lesson;
+  /** "Go deeper" nesting level: 1 = first deeper layer, 2+ = deeper still. */
+  depth?: number;
 }
 
 export interface Phase {

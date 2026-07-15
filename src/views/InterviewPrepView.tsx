@@ -206,7 +206,7 @@ export default function InterviewPrepView({ onBack, onStartLearningPlan }: Props
           </p>
           <p style={{ fontSize: 13.5, color: "var(--ink-60)", marginBottom: 14 }}>
             A focused study plan built from the actual gaps above — click into any topic for a real
-            lesson, worked example, and quiz, exactly like any OpenPath roadmap.
+            lesson, worked example, and quiz, exactly like any ZenWise roadmap.
           </p>
           {prep.learningPlan.map((area, ai) => (
             <div key={ai} style={{ marginBottom: 10 }}>

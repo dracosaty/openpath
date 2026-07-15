@@ -80,7 +80,9 @@ export default function RoadmapView({
     );
   }
 
-  function addDeeper(phaseId: string, topics: DeeperTopic[]) {
+  function addDeeper(phaseId: string, parent: RoadmapNode, topics: DeeperTopic[]) {
+    // Depth drives the purple tint: 1 = light purple, 2+ = dark purple.
+    const depth = (parent.depth ?? 0) + 1;
     const next: Roadmap = {
       ...roadmap!,
       phases: roadmap!.phases.map((p) =>
@@ -90,10 +92,23 @@ export default function RoadmapView({
               ...p,
               nodes: [
                 ...p.nodes,
-                ...topics.map((t) => ({ id: t.id, title: t.title })),
+                ...topics.map((t) => ({ id: t.id, title: t.title, depth })),
               ],
             },
       ),
+    };
+    onMutate(next);
+  }
+
+  /** Persist a freshly generated lesson onto its node so revisiting it never
+   *  regenerates — flows through onMutate into localStorage/Supabase. */
+  function cacheLesson(nodeId: string, lesson: NonNullable<RoadmapNode["lesson"]>) {
+    const next: Roadmap = {
+      ...roadmap!,
+      phases: roadmap!.phases.map((p) => ({
+        ...p,
+        nodes: p.nodes.map((n) => (n.id === nodeId ? { ...n, lesson } : n)),
+      })),
     };
     onMutate(next);
   }
@@ -172,10 +187,11 @@ export default function RoadmapView({
           <div className="rm-node-grid">
             {phase.nodes.map((node) => {
               const done = completed.has(node.id);
+              const depthCls = node.depth ? `deeper-${Math.min(node.depth, 2)}` : "";
               return (
                 <div
                   key={node.id}
-                  className={`rm-node ${done ? "done" : ""}`}
+                  className={`rm-node ${done ? "done" : ""} ${depthCls}`}
                   onClick={() => setOpenNode({ node, phaseId: phase.id })}
                 >
                   <span className="rm-node-check">{done ? "✓" : ""}</span>
@@ -198,8 +214,9 @@ export default function RoadmapView({
           completed={completed}
           onClose={() => setOpenNode(null)}
           onComplete={() => onComplete(openNode.node.id)}
-          onAddDeeper={(topics) => addDeeper(openNode.phaseId, topics)}
+          onAddDeeper={(topics) => addDeeper(openNode.phaseId, openNode.node, topics)}
           onNavigate={(node, phaseId) => setOpenNode({ node, phaseId })}
+          onLessonLoaded={cacheLesson}
         />
       )}
     </div>

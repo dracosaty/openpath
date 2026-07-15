@@ -32,7 +32,7 @@ export const SOCIALS: SocialTarget[] = [
 ];
 
 export function shareText(title: string): string {
-  return `I'm learning ${title} with a free AI roadmap on OpenPath. Make your own for any topic:`;
+  return `I'm learning ${title} with a free AI roadmap on ZenWise. Make your own for any topic:`;
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {

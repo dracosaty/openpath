@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
 import { PRESETS, SUGGESTIONS, type PresetCard } from "../data/presets";
-import { COMMUNITY } from "../data/community";
-import type { Roadmap } from "../types";
 
 interface Props {
   onStart: (topic: string) => void;
   onOpenPreset: (preset: PresetCard) => void;
-  onOpenShared: (roadmap: Roadmap) => void;
 }
 
 const ANIMATED_TOPICS = [
@@ -26,7 +23,7 @@ const STEPS = [
   {
     n: 1,
     title: "Type any topic",
-    body: "School subject, career skill, or pure curiosity — if you can name it, OpenPath can teach it.",
+    body: "School subject, career skill, or pure curiosity — if you can name it, ZenWise can teach it.",
   },
   {
     n: 2,
@@ -42,15 +39,12 @@ const STEPS = [
 
 const FEATURES = [
   { ic: "🗺️", title: "Personalised roadmaps", body: "A structured path from foundations to mastery, adapted to your level." },
-  { ic: "✏️", title: "Lessons + native diagrams", body: "Clear explanations, worked examples, and visual diagrams in every step." },
-  { ic: "🧠", title: "Spaced repetition", body: "Quiz items resurface on an SM-2 schedule so knowledge sticks for good." },
-  { ic: "🌍", title: "16 languages", body: "Learn in Hindi, Tamil, Spanish and more — India-first, globally capable." },
-  { ic: "↗", title: "Share & learn together", body: "Publish a roadmap with one tap; friends spin up their own in seconds." },
-  { ic: "∞", title: "Free, or bring your key", body: "Generous free daily limits — add your own AI key for unlimited usage." },
+  { ic: "✏️", title: "Lessons, diagrams & quizzes", body: "Clear explanations, worked examples, and a quick check inside every step." },
+  { ic: "🧠", title: "Spaced repetition", body: "Quiz items resurface on a schedule so knowledge actually sticks." },
 ];
 
-/** Landing / Explore page: hero generator + how-it-works + features + community. */
-export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) {
+/** Landing / Explore page: hero generator + how-it-works + features + presets. */
+export default function Explore({ onStart, onOpenPreset }: Props) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [topicIdx, setTopicIdx] = useState(0);
@@ -154,10 +148,10 @@ export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) 
 
       {/* ---------- FEATURES ---------- */}
       <section className="section" id="features" style={{ paddingTop: 0 }}>
-        <div className="section-eyebrow">Why OpenPath</div>
+        <div className="section-eyebrow">Why ZenWise</div>
         <h2 className="section-title">Everything you need to actually learn it</h2>
         <p className="section-sub">
-          Most tools dump information on you. OpenPath structures it, adapts it, and
+          Most tools dump information on you. ZenWise structures it, adapts it, and
           helps you remember it.
         </p>
         <div className="feature-grid">
@@ -166,33 +160,6 @@ export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) 
               <div className="ic">{f.ic}</div>
               <h3>{f.title}</h3>
               <p>{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- COMMUNITY / SOCIAL ---------- */}
-      <section className="section" id="community" style={{ paddingTop: 0 }}>
-        <div className="section-eyebrow">From the community</div>
-        <h2 className="section-title">Explore what others are learning</h2>
-        <p className="section-sub">
-          Real roadmaps people built and shared. Open one, then make your own version
-          in a tap.
-        </p>
-        <div className="community-grid">
-          {COMMUNITY.map((c) => (
-            <div key={c.roadmap.id} className="course-card" onClick={() => onOpenShared(c.roadmap)}>
-              <div className="rc-meta" style={{ marginBottom: 10 }}>
-                <span className="tag green">{c.roadmap.level}</span>
-              </div>
-              <h3>{c.roadmap.title}</h3>
-              <p>{c.roadmap.description}</p>
-              <div className="course-meta">
-                <span className="avatar" style={{ background: c.avatarColor }}>
-                  {c.author[0]}
-                </span>
-                {c.author} · {c.learners.toLocaleString()} learners
-              </div>
             </div>
           ))}
         </div>
@@ -233,7 +200,7 @@ export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) 
           <div className="footer-brand">
             <div className="brand">
               <span className="brand-dot" />
-              OpenPath
+              ZenWise
             </div>
             <p>
               Free, AI-guided learning for everyone — from class 6 to PhD. Built to
@@ -244,7 +211,6 @@ export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) 
             <h4>Product</h4>
             <a onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}>How it works</a>
             <a onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}>Features</a>
-            <a onClick={() => document.getElementById("community")?.scrollIntoView({ behavior: "smooth" })}>Community</a>
           </div>
           <div className="footer-col">
             <h4>Learn</h4>
@@ -256,14 +222,14 @@ export default function Explore({ onStart, onOpenPreset, onOpenShared }: Props) 
           </div>
           <div className="footer-col">
             <h4>Open source</h4>
-            <a href="https://github.com/satyhere/openpath" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/dracosaty/openpath" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
             <a>MIT License</a>
           </div>
         </div>
         <div className="footer-bottom">
-          © {new Date().getFullYear()} OpenPath · Made for curious minds everywhere
+          © {new Date().getFullYear()} ZenWise · Made for curious minds everywhere
         </div>
       </footer>
     </>

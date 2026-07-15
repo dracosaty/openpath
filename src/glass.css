@@ -1,5 +1,5 @@
 /* ============================================================
-   OpenPath — glassmorphism + responsive layer.
+   ZenWise — glassmorphism + responsive layer.
    Loaded AFTER styles.css so these rules win on equal specificity.
    Keeps the warm paper palette; adds frosted-glass surfaces, an
    aurora backdrop, a mobile/tablet nav, and the landing sections.
@@ -971,4 +971,41 @@
   to {
     transform: none;
   }
+}
+
+/* ---------- "Go deeper" node depth tints ---------- */
+/* depth 1 = light purple, depth 2+ = dark purple. :not(.done) keeps the
+   completed state (white bg + strikethrough) readable at any depth. */
+.rm-node.deeper-1:not(.done) {
+  background: #e9e1ff;
+}
+.rm-node.deeper-2:not(.done) {
+  background: #7c5cfc;
+  border-color: #2d1a66;
+  box-shadow: 2.5px 2.5px 0 #2d1a66;
+}
+.rm-node.deeper-2:not(.done):hover {
+  box-shadow: 4px 4px 0 #2d1a66;
+}
+.rm-node.deeper-2:not(.done) .rm-node-title {
+  color: #fff;
+}
+.rm-node.deeper-2:not(.done) .rm-node-check {
+  border-color: #fff;
+  background: transparent;
+}
+
+/* ---------- lesson body section headings ---------- */
+/* Tailwind's preflight resets h1-h6 to inherit, so these headings rendered
+   as plain body text ("Worked example" / "Key terms" were invisible as
+   sections). Give them a proper eyebrow treatment. */
+.lp-body h3 {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--accent);
+  margin: 24px 0 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ink-08);
 }

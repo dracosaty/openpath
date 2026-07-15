@@ -6,12 +6,15 @@ import { Fragment } from "react";
 // as plain text, so it degrades gracefully to the old plain rendering.
 //
 //   **bold**      -> <strong>
-//   *italic*      -> <em>
+//   *italic*      -> <em>       (also _italic_, guarded so snake_case
+//                                identifiers are never mangled)
 //   ==highlight== -> <mark class="lp-hl">
 //   `code`        -> <code class="lp-code">   (foreign words, terms, values)
 //
 // Order in the alternation matters: ** before * so bold wins over italic.
-const TOKEN = /(\*\*[^*]+\*\*|==[^=]+==|`[^`]+`|\*[^*\n]+\*)/g;
+// The _italic_ branch requires a non-word char on both outsides, so
+// `foo_bar_baz` (word chars adjacent to the underscores) stays untouched.
+const TOKEN = /(\*\*[^*]+\*\*|==[^=]+==|`[^`]+`|\*[^*\n]+\*|(?<![\w])_[^_\n]+_(?![\w]))/g;
 
 export default function RichText({ text }: { text: string }) {
   if (!text) return null;
@@ -35,6 +38,8 @@ export default function RichText({ text }: { text: string }) {
             </code>
           );
         if (p.length > 2 && p.startsWith("*") && p.endsWith("*"))
+          return <em key={i}>{p.slice(1, -1)}</em>;
+        if (p.length > 2 && p.startsWith("_") && p.endsWith("_"))
           return <em key={i}>{p.slice(1, -1)}</em>;
         return <Fragment key={i}>{p}</Fragment>;
       })}

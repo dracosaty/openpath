@@ -66,7 +66,7 @@ export default function AuthModal({ onClose }: Props) {
     >
       <div className="modal-card" style={{ maxWidth: 420 }}>
         <div className="lp-eyebrow">{mode === "signup" ? "Create account" : "Welcome back"}</div>
-        <h2>{mode === "signup" ? "Sign up for OpenPath" : "Sign in"}</h2>
+        <h2>{mode === "signup" ? "Sign up for ZenWise" : "Sign in"}</h2>
         <p className="modal-sub">Save your roadmaps and keep your progress across sessions.</p>
 
         {/* Google OAuth */}

@@ -30,6 +30,9 @@ interface Props {
   onComplete: () => void;
   onAddDeeper: (topics: DeeperTopic[]) => void;
   onNavigate: (node: RoadmapNode, phaseId: string) => void;
+  /** Called once after a lesson is generated so the parent can cache it on
+   *  the node — revisiting the node then skips regeneration entirely. */
+  onLessonLoaded: (nodeId: string, lesson: Lesson) => void;
 }
 
 export default function LessonPanel({
@@ -44,6 +47,7 @@ export default function LessonPanel({
   onComplete,
   onAddDeeper,
   onNavigate,
+  onLessonLoaded,
 }: Props) {
   const [lesson, setLesson] = useState<Lesson | null>(normalizeLesson(node.lesson));
   const [error, setError] = useState(false);
@@ -73,9 +77,11 @@ export default function LessonPanel({
   async function load() {
     setError(false);
     setLesson(normalizeLesson(node.lesson));
-    if (node.lesson) return;
+    if (node.lesson) return; // cached on the node — no regeneration
     try {
-      setLesson(normalizeLesson(await generateLesson(node.title, pathTitle, profile)));
+      const fresh = normalizeLesson(await generateLesson(node.title, pathTitle, profile));
+      setLesson(fresh);
+      if (fresh) onLessonLoaded(node.id, fresh);
     } catch {
       setError(true);
     }

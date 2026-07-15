@@ -46,9 +46,8 @@ Adapt vocabulary, depth and examples to this profile. A complete beginner gets p
   if (p.context && p.context.trim()) {
     s += `\nLearner background/context: ${p.context.trim().slice(0, 1500)}. Use this to skip what they already know and emphasise their gaps; reference their stated field/curriculum where relevant.`;
   }
-  if (p.language && p.language.trim() && p.language.trim().toLowerCase() !== "english") {
-    s += `\nIMPORTANT: Write ALL content (titles, text, examples, quiz) in ${p.language.trim()}. Keep JSON keys in English.`;
-  }
+  // Multilingual output removed for now — the current free model doesn't
+  // produce reliable non-English lessons. All content is English.
   return s;
 }
 

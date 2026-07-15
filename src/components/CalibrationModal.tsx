@@ -1,35 +1,30 @@
 import { useState } from "react";
 import { CALIBRATION_QUESTIONS } from "../lib/calibration";
-import { LANGUAGES } from "../lib/languages";
 import type { LearnerProfile } from "../types";
 
 interface Props {
   topic: string;
   initialContext?: string;
-  initialLanguage?: string;
   onCancel: () => void;
   onDone: (profile: LearnerProfile) => void;
 }
 
-/** Calibration modal: 3 quick questions + optional background context & language. */
+/** Calibration modal: 3 quick questions + optional background context. */
 export default function CalibrationModal({
   topic,
   initialContext = "",
-  initialLanguage = "English",
   onCancel,
   onDone,
 }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showContext, setShowContext] = useState(!!initialContext);
   const [context, setContext] = useState(initialContext);
-  const [language, setLanguage] = useState(initialLanguage);
   const complete = CALIBRATION_QUESTIONS.every((q) => answers[q.key]);
 
   function done() {
     onDone({
       ...(answers as unknown as LearnerProfile),
       context: context.trim() || undefined,
-      language,
     });
   }
 
@@ -59,22 +54,6 @@ export default function CalibrationModal({
             </div>
           </div>
         ))}
-
-        {/* Language */}
-        <div className="cal-q" style={{ marginTop: 18 }}>
-          Language
-        </div>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={selectStyle}
-        >
-          {LANGUAGES.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
 
         {/* Optional personalization context */}
         {!showContext ? (
@@ -118,13 +97,3 @@ export default function CalibrationModal({
     </div>
   );
 }
-
-const selectStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "11px 14px",
-  border: "1.5px solid var(--ink-12)",
-  borderRadius: 10,
-  fontFamily: "var(--font-body)",
-  fontSize: 15,
-  background: "#fff",
-};

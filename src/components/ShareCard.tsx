@@ -42,7 +42,7 @@ export default function ShareCard({ roadmap, variant = "share" }: Props) {
             display: "inline-block",
           }}
         />
-        OpenPath
+        ZenWise
       </div>
 
       <div>
