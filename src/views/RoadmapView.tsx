@@ -83,19 +83,21 @@ export default function RoadmapView({
   function addDeeper(phaseId: string, parent: RoadmapNode, topics: DeeperTopic[]) {
     // Depth drives the purple tint: 1 = light purple, 2+ = dark purple.
     const depth = (parent.depth ?? 0) + 1;
+    const newNodes = topics.map((t) => ({ id: t.id, title: t.title, depth }));
     const next: Roadmap = {
       ...roadmap!,
-      phases: roadmap!.phases.map((p) =>
-        p.id !== phaseId
-          ? p
-          : {
-              ...p,
-              nodes: [
-                ...p.nodes,
-                ...topics.map((t) => ({ id: t.id, title: t.title, depth })),
-              ],
-            },
-      ),
+      phases: roadmap!.phases.map((p) => {
+        if (p.id !== phaseId) return p;
+        // Splice the new nodes in right after their parent (rather than
+        // appending at the end) so they render adjacent to it — this also
+        // cascades correctly for "go deeper" on an already-deeper node.
+        const parentIdx = p.nodes.findIndex((n) => n.id === parent.id);
+        const insertAt = parentIdx === -1 ? p.nodes.length : parentIdx + 1;
+        return {
+          ...p,
+          nodes: [...p.nodes.slice(0, insertAt), ...newNodes, ...p.nodes.slice(insertAt)],
+        };
+      }),
     };
     onMutate(next);
   }
